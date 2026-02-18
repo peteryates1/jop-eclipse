@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+    <!-- JOP Perspective -->
+    <extension point="org.eclipse.ui.perspectives">
+        <perspective
+            id="com.jopdesign.ui.jopPerspective"
+            name="JOP"
+            class="com.jopdesign.ui.perspectives.JopPerspectiveFactory"
+            icon="icons/jop-16.png">
+        </perspective>
+    </extension>
+
+    <!-- Toggle JOP Nature command -->
+    <extension point="org.eclipse.ui.commands">
+        <command
+            id="com.jopdesign.ui.toggleNature"
+            name="Toggle JOP Nature"
+            description="Add or remove the JOP nature from a Java project">
+        </command>
+    </extension>
+
+    <!-- Handler for toggle nature command -->
+    <extension point="org.eclipse.ui.handlers">
+        <handler
+            class="com.jopdesign.ui.actions.ToggleJopNatureHandler"
+            commandId="com.jopdesign.ui.toggleNature">
+        </handler>
+    </extension>
+
+    <!-- Context menu contribution for toggle nature -->
+    <extension point="org.eclipse.ui.menus">
+        <menuContribution
+            allPopups="false"
+            locationURI="popup:org.eclipse.ui.projectConfigure">
+            <command
+                commandId="com.jopdesign.ui.toggleNature"
+                label="JOP Nature"
+                style="push">
+                <visibleWhen checkEnabled="false">
+                    <with variable="selection">
+                        <iterate ifEmpty="false">
+                            <adapt type="org.eclipse.core.resources.IProject">
+                                <test property="org.eclipse.core.resources.projectNature"
+                                      value="org.eclipse.jdt.core.javanature"/>
+                            </adapt>
+                        </iterate>
+                    </with>
+                </visibleWhen>
+            </command>
+        </menuContribution>
+    </extension>
+
+    <!-- JOP Project Properties page -->
+    <extension point="org.eclipse.ui.propertyPages">
+        <page
+            id="com.jopdesign.ui.properties.jopPropertyPage"
+            name="JOP"
+            class="com.jopdesign.ui.properties.JopPropertyPage">
+            <enabledWhen>
+                <adapt type="org.eclipse.core.resources.IProject">
+                    <test property="org.eclipse.core.resources.projectNature"
+                          value="com.jopdesign.core.jopNature"/>
+                </adapt>
+            </enabledWhen>
+        </page>
+    </extension>
+
+    <!-- Preference page for workspace-level JOP settings -->
+    <extension point="org.eclipse.ui.preferencePages">
+        <page
+            id="com.jopdesign.ui.preferences.jopPreferencePage"
+            name="JOP"
+            class="com.jopdesign.ui.properties.JopPreferencePage">
+        </page>
+    </extension>
+
+</plugin>

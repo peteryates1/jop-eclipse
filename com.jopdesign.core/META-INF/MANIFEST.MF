@@ -1,0 +1,17 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JOP Core
+Bundle-SymbolicName: com.jopdesign.core;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: com.jopdesign.core.JopCorePlugin
+Bundle-Vendor: JOP Design
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.jdt.core
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-ActivationPolicy: lazy
+Export-Package: com.jopdesign.core,
+ com.jopdesign.core.nature,
+ com.jopdesign.core.builder,
+ com.jopdesign.core.preferences,
+ com.jopdesign.core.toolchain

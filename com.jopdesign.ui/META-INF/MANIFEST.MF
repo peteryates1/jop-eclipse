@@ -1,0 +1,20 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JOP UI
+Bundle-SymbolicName: com.jopdesign.ui;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: com.jopdesign.ui.JopUIPlugin
+Bundle-Vendor: JOP Design
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.ui,
+ org.eclipse.ui.ide,
+ org.eclipse.jdt.core,
+ org.eclipse.jdt.ui,
+ com.jopdesign.core
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-ActivationPolicy: lazy
+Export-Package: com.jopdesign.ui,
+ com.jopdesign.ui.perspectives,
+ com.jopdesign.ui.properties,
+ com.jopdesign.ui.actions

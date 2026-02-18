@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+    <feature id="com.jopdesign.feature" version="0.0.0">
+        <category name="jop"/>
+    </feature>
+
+    <category-def name="jop" label="JOP Eclipse Tooling">
+        <description>
+            Eclipse IDE plugins for JOP (Java Optimized Processor) development.
+        </description>
+    </category-def>
+</site>

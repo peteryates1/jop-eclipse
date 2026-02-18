@@ -1,0 +1,19 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JOP Microcode Editor
+Bundle-SymbolicName: com.jopdesign.microcode;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: com.jopdesign.microcode.MicrocodePlugin
+Bundle-Vendor: JOP Design
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.ui,
+ org.eclipse.ui.editors,
+ org.eclipse.jface.text,
+ org.eclipse.ui.views,
+ com.jopdesign.core
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-ActivationPolicy: lazy
+Export-Package: com.jopdesign.microcode,
+ com.jopdesign.microcode.editor,
+ com.jopdesign.microcode.syntax

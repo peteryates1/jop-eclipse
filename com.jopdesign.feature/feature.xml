@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+    id="com.jopdesign.feature"
+    label="JOP Eclipse Tooling"
+    version="1.0.0.qualifier"
+    provider-name="JOP Design">
+
+    <description>
+        Eclipse IDE plugins for JOP (Java Optimized Processor) development.
+        Provides a JOP project nature, microcode assembly editor, JOP builder,
+        and tools for building, uploading, and debugging JOP applications.
+    </description>
+
+    <license url="http://www.gnu.org/licenses/gpl-3.0.html">
+        GNU General Public License v3.0
+    </license>
+
+    <requires>
+        <import feature="org.eclipse.jdt" version="3.19.0" match="greaterOrEqual"/>
+    </requires>
+
+    <plugin
+        id="com.jopdesign.core"
+        download-size="0"
+        install-size="0"
+        version="0.0.0"
+        unpack="false"/>
+
+    <plugin
+        id="com.jopdesign.microcode"
+        download-size="0"
+        install-size="0"
+        version="0.0.0"
+        unpack="false"/>
+
+    <plugin
+        id="com.jopdesign.ui"
+        download-size="0"
+        install-size="0"
+        version="0.0.0"
+        unpack="false"/>
+
+</feature>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+    <!-- JOP Project Nature -->
+    <extension point="org.eclipse.core.resources.natures"
+               id="jopNature"
+               name="JOP Nature">
+        <runtime>
+            <run class="com.jopdesign.core.nature.JopNature"/>
+        </runtime>
+        <requires-nature id="org.eclipse.jdt.core.javanature"/>
+        <builder id="com.jopdesign.core.jopBuilder"/>
+    </extension>
+
+    <!-- JOP Builder -->
+    <extension point="org.eclipse.core.resources.builders"
+               id="jopBuilder"
+               name="JOP Builder">
+        <builder hasNature="true">
+            <run class="com.jopdesign.core.builder.JopBuilder"/>
+        </builder>
+    </extension>
+
+    <!-- Preference initializer -->
+    <extension point="org.eclipse.core.runtime.preferences">
+        <initializer class="com.jopdesign.core.preferences.JopPreferenceInitializer"/>
+    </extension>
+
+</plugin>

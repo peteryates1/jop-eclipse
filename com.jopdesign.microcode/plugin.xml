@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+    <!-- Microcode Assembly Editor -->
+    <extension point="org.eclipse.ui.editors">
+        <editor id="com.jopdesign.microcode.editor"
+                name="JOP Microcode Editor"
+                extensions="asm,mic"
+                icon="icons/microcode.png"
+                class="com.jopdesign.microcode.editor.MicrocodeEditor"
+                contributorClass="org.eclipse.ui.texteditor.BasicTextEditorActionContributor"
+                default="false">
+        </editor>
+    </extension>
+
+    <!-- Content type for JOP microcode assembly -->
+    <extension point="org.eclipse.core.contenttype.contentTypes">
+        <content-type id="com.jopdesign.microcode.contentType"
+                      name="JOP Microcode Assembly"
+                      base-type="org.eclipse.core.runtime.text"
+                      file-extensions="asm,mic"
+                      priority="normal">
+        </content-type>
+    </extension>
+
+    <!-- Document setup participant for microcode partitioning -->
+    <extension point="org.eclipse.core.filebuffers.documentSetup">
+        <participant
+            class="com.jopdesign.microcode.editor.MicrocodeDocumentSetupParticipant"
+            contentTypeId="com.jopdesign.microcode.contentType">
+        </participant>
+    </extension>
+
+</plugin>
