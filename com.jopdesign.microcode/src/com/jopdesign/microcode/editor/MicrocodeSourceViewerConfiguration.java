@@ -1,6 +1,7 @@
 package com.jopdesign.microcode.editor;
 
 import org.eclipse.jface.text.IDocument;
+import org.eclipse.jface.text.ITextHover;
 import org.eclipse.jface.text.TextAttribute;
 import org.eclipse.jface.text.contentassist.ContentAssistant;
 import org.eclipse.jface.text.contentassist.IContentAssistant;
@@ -78,6 +79,14 @@ public class MicrocodeSourceViewerConfiguration extends SourceViewerConfiguratio
 		assistant.setProposalPopupOrientation(IContentAssistant.PROPOSAL_OVERLAY);
 		assistant.setInformationControlCreator(getInformationControlCreator(sourceViewer));
 		return assistant;
+	}
+
+	@Override
+	public ITextHover getTextHover(ISourceViewer sourceViewer, String contentType) {
+		if (IDocument.DEFAULT_CONTENT_TYPE.equals(contentType)) {
+			return new MicrocodeTextHover();
+		}
+		return null;
 	}
 
 	private MicrocodeCodeScanner getCodeScanner() {
