@@ -1,9 +1,13 @@
 package com.jopdesign.core.nature;
 
+import java.io.File;
+
 import org.eclipse.core.resources.ICommand;
+import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IProjectNature;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.ILog;
 import org.eclipse.core.runtime.Path;
@@ -13,6 +17,8 @@ import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
 
 import com.jopdesign.core.classpath.JopClasspathContainer;
+import com.jopdesign.core.preferences.JopPreferences;
+import com.jopdesign.core.preferences.JopProjectPreferences;
 
 /**
  * JOP project nature. Added alongside the Java nature to mark a project
@@ -62,6 +68,9 @@ public class JopNature implements IProjectNature {
 		// Set JDT compiler compliance to 1.8 (minimum JDT supports) for IDE
 		// editing. The actual JOP build uses external JDK 1.6 javac.
 		setCompilerCompliance("1.8");
+
+		// Link JOP_HOME/asm/ into the project for microcode source access
+		linkAsmFolder();
 	}
 
 	@Override
@@ -92,6 +101,9 @@ public class JopNature implements IProjectNature {
 
 		// Remove project-specific compiler compliance (revert to workspace default)
 		clearCompilerCompliance();
+
+		// Remove linked asm/ folder if present
+		unlinkAsmFolder();
 	}
 
 	@Override
@@ -190,6 +202,44 @@ public class JopNature implements IProjectNature {
 			javaProject.setOptions(options);
 		} catch (Exception e) {
 			LOG.warn("Failed to clear compiler compliance: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Create a linked folder {@code asm/} pointing to {@code JOP_HOME/asm/}
+	 * so that microcode sources are visible in the Package Explorer.
+	 */
+	private void linkAsmFolder() {
+		try {
+			String jopHome = JopProjectPreferences.get(project, JopPreferences.JOP_HOME, "");
+			if (jopHome.isEmpty()) return;
+
+			File asmDir = new File(jopHome, "asm");
+			if (!asmDir.isDirectory()) return;
+
+			IFolder asmFolder = project.getFolder("asm");
+			if (!asmFolder.exists()) {
+				asmFolder.createLink(new Path(asmDir.getAbsolutePath()),
+						IResource.NONE, null);
+				LOG.info("Linked asm/ → " + asmDir.getAbsolutePath());
+			}
+		} catch (Exception e) {
+			LOG.warn("Failed to link asm/ folder: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Remove the linked {@code asm/} folder if it was created by us (i.e. is a linked resource).
+	 */
+	private void unlinkAsmFolder() {
+		try {
+			IFolder asmFolder = project.getFolder("asm");
+			if (asmFolder.exists() && asmFolder.isLinked()) {
+				asmFolder.delete(true, null);
+				LOG.info("Removed linked asm/ folder");
+			}
+		} catch (Exception e) {
+			LOG.warn("Failed to remove linked asm/ folder: " + e.getMessage());
 		}
 	}
 

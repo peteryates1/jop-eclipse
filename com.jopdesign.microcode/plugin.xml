@@ -10,7 +10,7 @@
                 icon="icons/microcode.png"
                 class="com.jopdesign.microcode.editor.MicrocodeEditor"
                 contributorClass="org.eclipse.ui.texteditor.BasicTextEditorActionContributor"
-                default="false">
+                default="true">
         </editor>
     </extension>
 
