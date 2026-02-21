@@ -31,10 +31,27 @@ public class JopPerspectiveFactory implements IPerspectiveFactory {
 		bottom.addView("org.eclipse.ui.console.ConsoleView");
 		bottom.addView(IPageLayout.ID_PROP_SHEET);
 
-		// Shortcuts
+		// New wizard shortcuts (appear in right-click → New)
 		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.JavaProjectWizard");
+		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.NewPackageCreationWizard");
+		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.NewClassCreationWizard");
+		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.NewInterfaceCreationWizard");
+		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.NewEnumCreationWizard");
+		layout.addNewWizardShortcut("org.eclipse.jdt.ui.wizards.NewSourceFolderCreationWizard");
 		layout.addNewWizardShortcut("org.eclipse.ui.wizards.new.file");
 		layout.addNewWizardShortcut("org.eclipse.ui.wizards.new.folder");
+
+		// Show view shortcuts
+		layout.addShowViewShortcut("org.eclipse.jdt.ui.PackageExplorer");
+		layout.addShowViewShortcut("org.eclipse.jdt.ui.TypeHierarchy");
+		layout.addShowViewShortcut(IPageLayout.ID_OUTLINE);
+		layout.addShowViewShortcut(IPageLayout.ID_PROBLEM_VIEW);
+		layout.addShowViewShortcut("org.eclipse.ui.console.ConsoleView");
+
+		// Action sets (toolbar/menu contributions from JDT)
+		layout.addActionSet("org.eclipse.jdt.ui.JavaActionSet");
+		layout.addActionSet("org.eclipse.jdt.ui.JavaElementCreationActionSet");
+		layout.addActionSet(IPageLayout.ID_NAVIGATE_ACTION_SET);
 
 		layout.addPerspectiveShortcut("org.eclipse.jdt.ui.JavaPerspective");
 		layout.addPerspectiveShortcut("org.eclipse.debug.ui.DebugPerspective");
