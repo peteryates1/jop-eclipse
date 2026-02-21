@@ -11,7 +11,13 @@ Require-Bundle: org.eclipse.core.runtime,
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Export-Package: com.jopdesign.core,
+ com.jopdesign.core.board,
+ com.jopdesign.core.classpath,
+ com.jopdesign.core.deploy,
+ com.jopdesign.core.fpga,
+ com.jopdesign.core.io,
  com.jopdesign.core.nature,
  com.jopdesign.core.builder,
  com.jopdesign.core.preferences,
+ com.jopdesign.core.sim,
  com.jopdesign.core.toolchain

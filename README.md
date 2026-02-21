@@ -12,19 +12,83 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
   - Hover help showing opcode, dataflow, stack effect, and JVM bytecode equivalent
   - Outline view with labels, constants, and variables for navigation
   - Comment and preprocessor directive highlighting
-- **JOP Nature & Builder** (builder stubs, not yet wired to toolchain)
+- **Microcode Build** (Phase 1)
+  - GCC preprocessor invocation with configurable defines (`-DSERIAL`, `-DSIMULATION`, etc.)
+  - Jopa assembler invocation producing ROM/RAM data, jump tables, Scala output
+  - Error parsing with problem markers in the Problems view
+  - Incremental build: only rebuilds when `.asm`/`.inc`/`.mic` files change
+  - Project-scoped preferences with workspace-level fallback
+- **Java Application Build** (Phase 2)
+  - JOP Runtime classpath container (adds `target/classes` to Java build path)
+  - PreLinker invocation: merges project + runtime classes, preprocesses bytecodes
+  - JOPizer invocation: produces `.jop` binary for JOP processor
+  - Error parsing for PreLinker/JOPizer with problem markers
+  - Configurable main class and output directory in project properties
+- **Board Configuration** (Phase 3)
+  - 7 predefined board definitions in JSON (QMTECH, Alchitry Au, CYC5000, CYC1000, MAX1000, minimal)
+  - Board selection dropdown with auto-populated FPGA info and defaults
+  - JopConfig parameter editor: method cache, stack buffer, object/array cache with validation
+  - Memory type and boot mode selection
+  - Live SpinalHDL config preview (generates Scala `JopConfig(...)` snippet)
+  - ScalaConfigGenerator for programmatic access to board config
+- **FPGA Synthesis** (Phase 4)
+  - SpinalHDL Verilog generation via SBT (`sbt runMain {TopModule}Verilog`)
+  - Quartus flow: analysis, fitter, assembler, timing analysis (4-step pipeline)
+  - Vivado flow: clock wizard, MIG, project creation, bitstream (TCL script-driven)
+  - Auto-selects synthesis tool based on board configuration
+  - Quartus project auto-detection from `.qpf` files
+  - Vivado `run_vivado.sh` wrapper support
+  - Background Job execution with progress reporting
+  - Dedicated "JOP FPGA Synthesis" console for output
+  - "Synthesize FPGA" context menu command on JOP projects
+  - Configurable SBT, Quartus, and Vivado paths in workspace preferences
+- **Deploy & Monitor** (Phase 5)
+  - FPGA programming via JTAG: Quartus (auto-generated CDF, USB-Blaster) and Vivado (TCL scripts)
+  - Serial download of .jop files to board (delegates to download.py with echo verification)
+  - Download-and-monitor mode (download.py -e flag)
+  - UART monitor with real-time streaming to Eclipse console (delegates to monitor.py)
+  - Shared "JOP Deploy" console with terminate support for stopping the monitor
+  - "JOP" context submenu on JOP projects: Synthesize FPGA, Program FPGA, Download Application, Start Monitor
+  - Auto-detection of .jop file from build output directory
+  - Configurable serial port and baud rate per board
+- **Simulation & Debug** (Phase 6)
+  - JopSim (Java-level simulation): runs built .jop files in a bytecode interpreter
+  - Statistics parsing: instruction count, cycle count, CPI extracted from output
+  - Symbol file (.jop.link.txt) support for debug tracing
+  - Configurable trace level (0=off, 1=method entry/exit, 2=+fields, 3=full bytecode)
+  - RTL simulation via SpinalHDL/Verilator (4 predefined sim classes)
+  - Dedicated "JOP Simulation" console for sim output
+  - "Run JopSim" and "Run RTL Simulation" in the JOP context submenu
+- **Multi-Core / CMP Configuration** (Phase 7)
+  - Enable Multi-Core checkbox with CPU core count spinner (1-8)
+  - Memory arbiter type selection (TDMA, Priority, Round-Robin)
+  - Debug instrumentation toggle
+  - CMP parameters in SpinalHDL config preview and ScalaConfigGenerator output
+  - Board definitions extended with enableMultiCore, cpuCount, enableDebug fields
+  - Ready for hardware-side CMP integration (BmbSys cpuId/cpuCnt, Java Scheduler arrays)
+- **IO / Peripheral Configuration** (Phase 8)
+  - Peripheral definition model with register maps, pin requirements, and SpinalHDL class names
+  - 6 predefined peripherals: System Controller (slot 0, fixed), UART (slot 1, fixed), GPIO, SPI Master, I2C Master, Timer/Counter
+  - IO peripheral picker in board config: checkboxes for optional peripherals with slot assignment (2 or 3)
+  - Slot conflict detection with validation error display
+  - Live IO address map showing allocated and available slots with register summaries
+  - Java driver stub generator: produces HardwareObject-based drivers with register fields and accessor methods
+  - Pin constraint template generation for Quartus (.qsf) and Vivado (.xdc)
+  - IO peripheral config reflected in SpinalHDL config preview
+  - "Generate IO Drivers" context menu command
+- **JOP Nature & Builder** (wired to microcode + Java toolchain)
 - **JOP Perspective** (Package Explorer, Outline, Problems/Console layout)
-- **Project Properties** (JOP_HOME, serial port, main class, output dir)
-- **Workspace Preferences** (Window > Preferences > JOP)
+- **Project Properties** (JOP_HOME, serial port, microcode defines, main class, output dir, board config)
+- **Workspace Preferences** (Window > Preferences > JOP: includes FPGA tool paths)
 - **Toggle JOP Nature** via project context menu (Configure > Toggle JOP Nature)
 
 ### Plugin Structure
 
 | Module | Bundle ID | Purpose |
 |--------|-----------|---------|
-| `com.jopdesign.core` | Core | Nature, Builder, Preferences, Toolchain abstraction |
+| `com.jopdesign.core` | Core | Nature, Builder, Preferences, Toolchain, FPGA synthesis |
 | `com.jopdesign.microcode` | Editor | Microcode assembly editor with full IDE support |
-| `com.jopdesign.ui` | UI | Perspective, property pages, nature toggle |
+| `com.jopdesign.ui` | UI | Perspective, property pages, nature toggle, FPGA synthesis command |
 | `com.jopdesign.feature` | Feature | Eclipse feature for p2 distribution |
 | `com.jopdesign.site` | Site | p2 update site |
 | `com.jopdesign.target` | Target | Target platform definition (Eclipse 2025-12) |
@@ -108,10 +172,10 @@ Wire the JOP Builder to invoke the microcode assembler.
 **Outputs:** `JumpTableData.scala`, `mem_rom.dat`, `mem_ram.dat`, `rom.mif`
 
 **Eclipse integration needed:**
-- [ ] Configure JOP_HOME (path to jop-spinal project) in project properties
-- [ ] Invoke gcc preprocessor with configurable defines (`-DSERIAL`, `-DSIMULATION`, etc.)
-- [ ] Invoke Jopa assembler (jar at `java/tools/jopa/dist/lib/jopa.jar`)
-- [ ] Error markers from Jopa output parsed and shown in Problems view
+- [x] Configure JOP_HOME (path to jop-spinal project) in project properties
+- [x] Invoke gcc preprocessor with configurable defines (`-DSERIAL`, `-DSIMULATION`, etc.)
+- [x] Invoke Jopa assembler (jar at `java/tools/jopa/dist/lib/jopa.jar`)
+- [x] Error markers from Jopa output parsed and shown in Problems view
 - [ ] Console output for build progress
 
 ### Phase 2: Java Application Build (JOPizer Integration)
@@ -128,11 +192,11 @@ Wire the JOP Builder to invoke the microcode assembler.
 - JOPizer/PreLinker: `java/tools/dist/jopizer.jar`
 
 **Eclipse integration needed:**
-- [ ] JOP classpath container (JOP runtime + JDK stubs on Java build path)
-- [ ] Builder step: PreLinker invocation after javac
-- [ ] Builder step: JOPizer invocation to produce `.jop` file
-- [ ] Configurable main class in project properties
-- [ ] Error parsing for PreLinker/JOPizer output
+- [x] JOP classpath container (JOP runtime + JDK stubs on Java build path)
+- [x] Builder step: PreLinker invocation after javac
+- [x] Builder step: JOPizer invocation to produce `.jop` file
+- [x] Configurable main class in project properties
+- [x] Error parsing for PreLinker/JOPizer output
 
 ### Phase 3: BSP / Board Configuration
 
@@ -176,12 +240,12 @@ Central configuration UI for selecting and configuring target hardware.
 - `minimal` - Testing/simulation (1KB cache, no object/array cache)
 
 **Eclipse integration needed:**
-- [ ] Board configuration wizard / property page
-- [ ] Board definition files (XML/JSON) that can be extended for new boards
+- [x] Board configuration wizard / property page
+- [x] Board definition files (XML/JSON) that can be extended for new boards
 - [ ] Pin assignment viewer (read-only, from .qsf/.xdc files)
-- [ ] JopConfig parameter editor with validation
+- [x] JopConfig parameter editor with validation
 - [ ] IO peripheral selection (future: GPIO, SPI, I2C, etc.)
-- [ ] Generate SpinalHDL config Scala from UI selections
+- [x] Generate SpinalHDL config Scala from UI selections
 
 ### Phase 4: FPGA Synthesis Integration
 
@@ -200,13 +264,13 @@ vivado -mode batch -source build_bitstream.tcl
 ```
 
 **Eclipse integration needed:**
-- [ ] Workspace preference: Quartus install path (e.g. `/opt/intelFPGA_lite/23.1std/quartus/bin`)
-- [ ] Workspace preference: Vivado install path (e.g. `/opt/Xilinx/Vivado/2024.1/bin`)
-- [ ] Builder step: SpinalHDL generation (`sbt runMain jop.system.JopBramTopVerilog`)
-- [ ] Builder step: Invoke Quartus or Vivado synthesis
+- [x] Workspace preference: Quartus install path (e.g. `/opt/intelFPGA_lite/23.1std/quartus/bin`)
+- [x] Workspace preference: Vivado install path (e.g. `/opt/Xilinx/Vivado/2024.1/bin`)
+- [x] Builder step: SpinalHDL generation (`sbt runMain jop.system.JopBramTopVerilog`)
+- [x] Builder step: Invoke Quartus or Vivado synthesis
 - [ ] Parse synthesis reports for resource usage, timing, warnings
-- [ ] Console view for synthesis progress
-- [ ] SBT install path preference
+- [x] Console view for synthesis progress
+- [x] SBT install path preference
 
 ### Phase 5: Deploy & Monitor
 
@@ -225,9 +289,15 @@ vivado -mode batch -source build_bitstream.tcl
 - [ ] Launch configuration: "JOP Application" (program FPGA + upload + monitor)
 - [ ] Launch configuration: "JOP BRAM" (program FPGA with embedded app)
 - [ ] Serial console view (jSerialComm library, replaces old RXTX)
-- [ ] Serial port selection and baud rate config
-- [ ] Upload progress indicator
+- [x] Serial port selection and baud rate config
+- [x] Upload progress indicator
 - [ ] Download protocol implementation in Java (replaces Python script)
+
+**Implemented via context menu commands (right-click JOP project > JOP):**
+- [x] Program FPGA (Quartus CDF generation + quartus_pgm, Vivado TCL)
+- [x] Download Application (invokes download.py with configured serial port)
+- [x] Start Monitor (invokes monitor.py with streaming console output)
+- [x] Shared "JOP Deploy" console with terminate support
 
 ### Phase 6: Simulation & Debug
 
@@ -242,37 +312,38 @@ sbt "testOnly jop.test.JopCoreBramSim"
 ```
 
 **Eclipse integration needed:**
-- [ ] Launch configuration: "JOP Simulation" (JopSim)
-- [ ] Cycle count display and basic profiling
+- [x] Launch configuration: "JOP Simulation" (JopSim) — implemented as context menu command
+- [x] Cycle count display and basic profiling
 - [ ] Breakpoint support via JopSim instrumentation (future)
-- [ ] RTL simulation launch (sbt test, future)
+- [x] RTL simulation launch (sbt "Test / runMain") — implemented as context menu command
 
 ### Phase 7: Multi-Core / CMP (Future)
 
 The original JOP supported 2-4 core CMP with TDMA memory arbitration. JOP-SpinalHDL has infrastructure (`cpuId`, `cpuCnt` parameters in BmbSys) but not full implementation yet.
 
-**When implemented, Eclipse will need:**
-- [ ] Core count selection in board config (1-N)
-- [ ] Memory arbiter selection (TDMA, priority, fairness)
-- [ ] Per-core debug/monitor views
-- [ ] Shared memory synchronisation visualisation
+**Eclipse integration:**
+- [x] Core count selection in board config (1-8)
+- [x] Memory arbiter selection (TDMA, Priority, Round-Robin)
+- [x] CMP parameters in ScalaConfigGenerator and config preview
+- [ ] Per-core debug/monitor views (requires hardware CMP integration)
+- [ ] Shared memory synchronisation visualisation (requires hardware CMP integration)
 
-### Phase 8: IO / Peripheral Configuration (Future)
+### Phase 8: IO / Peripheral Configuration
 
-Currently JOP-SpinalHDL has UART and system controller. Future peripherals:
+Currently JOP-SpinalHDL has UART and system controller. Future peripherals (definitions ready, hardware implementation pending):
 
-- [ ] GPIO (accent on real-time guarantees)
-- [ ] SPI master/slave
-- [ ] I2C
-- [ ] Timer/counter with interrupt
+- [x] GPIO (accent on real-time guarantees) — definition with 32-bit bidirectional, atomic set/clear/toggle
+- [x] SPI master — definition with configurable CPOL/CPHA, clock divider, chip select
+- [x] I2C master — definition with 7-bit addressing, prescaler, start/stop generation
+- [x] Timer/counter with interrupt — definition with 2 channels, compare match, auto-reload
 - [ ] Ethernet MAC (from original JOP)
 - [ ] Custom hardware accelerators
 
-**Eclipse will need:**
-- [ ] IO peripheral picker in board config (checkboxes + address assignment)
-- [ ] Generated Java driver stubs for selected peripherals
-- [ ] Address map visualisation
-- [ ] Pin assignment constraint generation
+**Eclipse integration:**
+- [x] IO peripheral picker in board config (checkboxes + slot assignment, conflict detection)
+- [x] Generated Java driver stubs for selected peripherals (HardwareObject pattern)
+- [x] Address map visualisation (shows slots, peripherals, register summaries)
+- [x] Pin assignment constraint generation (Quartus .qsf and Vivado .xdc templates)
 
 ---
 

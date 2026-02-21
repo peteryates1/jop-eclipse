@@ -18,15 +18,21 @@ import org.eclipse.ui.dialogs.PropertyPage;
 
 import com.jopdesign.core.JopCorePlugin;
 import com.jopdesign.core.preferences.JopPreferences;
+import com.jopdesign.core.preferences.JopProjectPreferences;
 
 /**
  * Project property page for JOP settings.
- * Configures JOP_HOME, serial port, board target, and boot mode per project.
+ * Configures JOP_HOME, serial port, board target, microcode defines,
+ * main class, and output directory per project.
+ *
+ * Values are stored in project-scoped preferences. Empty fields fall back
+ * to workspace-level defaults (Window > Preferences > JOP).
  */
 public class JopPropertyPage extends PropertyPage {
 
 	private Text jopHomeText;
 	private Text serialPortText;
+	private Text microcodeDefinesText;
 	private Text mainClassText;
 	private Text outputDirText;
 
@@ -36,7 +42,9 @@ public class JopPropertyPage extends PropertyPage {
 		composite.setLayout(new GridLayout(3, false));
 		composite.setLayoutData(new GridData(GridData.FILL_BOTH));
 
-		IEclipsePreferences prefs = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID);
+		IProject project = getProject();
+		IEclipsePreferences projectPrefs = JopProjectPreferences.forProject(project);
+		IEclipsePreferences workspacePrefs = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID);
 
 		// JOP Home
 		Group pathGroup = createGroup(composite, "JOP Installation", 3);
@@ -44,7 +52,9 @@ public class JopPropertyPage extends PropertyPage {
 		new Label(pathGroup, SWT.NONE).setText("JOP Home:");
 		jopHomeText = new Text(pathGroup, SWT.BORDER);
 		jopHomeText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		jopHomeText.setText(prefs.get(JopPreferences.JOP_HOME, ""));
+		jopHomeText.setText(projectPrefs.get(JopPreferences.JOP_HOME,
+				workspacePrefs.get(JopPreferences.JOP_HOME, "")));
+		jopHomeText.setToolTipText("Path to JOP installation (leave empty to use workspace default)");
 		Button browseButton = new Button(pathGroup, SWT.PUSH);
 		browseButton.setText("Browse...");
 		browseButton.addListener(SWT.Selection, e -> {
@@ -62,8 +72,20 @@ public class JopPropertyPage extends PropertyPage {
 		new Label(hwGroup, SWT.NONE).setText("Serial Port:");
 		serialPortText = new Text(hwGroup, SWT.BORDER);
 		serialPortText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		serialPortText.setText(prefs.get(JopPreferences.SERIAL_PORT, "/dev/ttyUSB0"));
+		serialPortText.setText(projectPrefs.get(JopPreferences.SERIAL_PORT,
+				workspacePrefs.get(JopPreferences.SERIAL_PORT, "/dev/ttyUSB0")));
 		new Label(hwGroup, SWT.NONE); // spacer
+
+		// Microcode settings
+		Group mcGroup = createGroup(composite, "Microcode", 3);
+
+		new Label(mcGroup, SWT.NONE).setText("Preprocessor Defines:");
+		microcodeDefinesText = new Text(mcGroup, SWT.BORDER);
+		microcodeDefinesText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		microcodeDefinesText.setText(projectPrefs.get(JopPreferences.MICROCODE_DEFINES,
+				workspacePrefs.get(JopPreferences.MICROCODE_DEFINES, "SERIAL")));
+		microcodeDefinesText.setToolTipText("Comma-separated defines (e.g., SERIAL,SIMULATION)");
+		new Label(mcGroup, SWT.NONE); // spacer
 
 		// Build settings
 		Group buildGroup = createGroup(composite, "Build", 3);
@@ -71,13 +93,15 @@ public class JopPropertyPage extends PropertyPage {
 		new Label(buildGroup, SWT.NONE).setText("Main Class:");
 		mainClassText = new Text(buildGroup, SWT.BORDER);
 		mainClassText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		mainClassText.setText(prefs.get(JopPreferences.MAIN_CLASS, ""));
+		mainClassText.setText(projectPrefs.get(JopPreferences.MAIN_CLASS,
+				workspacePrefs.get(JopPreferences.MAIN_CLASS, "")));
 		new Label(buildGroup, SWT.NONE); // spacer
 
 		new Label(buildGroup, SWT.NONE).setText("Output Directory:");
 		outputDirText = new Text(buildGroup, SWT.BORDER);
 		outputDirText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
-		outputDirText.setText(prefs.get(JopPreferences.JOP_OUTPUT_DIR, "build"));
+		outputDirText.setText(projectPrefs.get(JopPreferences.JOP_OUTPUT_DIR,
+				workspacePrefs.get(JopPreferences.JOP_OUTPUT_DIR, "build")));
 		new Label(buildGroup, SWT.NONE); // spacer
 
 		return composite;
@@ -95,9 +119,10 @@ public class JopPropertyPage extends PropertyPage {
 
 	@Override
 	public boolean performOk() {
-		IEclipsePreferences prefs = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID);
+		IEclipsePreferences prefs = JopProjectPreferences.forProject(getProject());
 		prefs.put(JopPreferences.JOP_HOME, jopHomeText.getText());
 		prefs.put(JopPreferences.SERIAL_PORT, serialPortText.getText());
+		prefs.put(JopPreferences.MICROCODE_DEFINES, microcodeDefinesText.getText());
 		prefs.put(JopPreferences.MAIN_CLASS, mainClassText.getText());
 		prefs.put(JopPreferences.JOP_OUTPUT_DIR, outputDirText.getText());
 		try {
@@ -110,10 +135,12 @@ public class JopPropertyPage extends PropertyPage {
 
 	@Override
 	protected void performDefaults() {
-		jopHomeText.setText("");
-		serialPortText.setText("/dev/ttyUSB0");
-		mainClassText.setText("");
-		outputDirText.setText("build");
+		IEclipsePreferences workspacePrefs = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID);
+		jopHomeText.setText(workspacePrefs.get(JopPreferences.JOP_HOME, ""));
+		serialPortText.setText(workspacePrefs.get(JopPreferences.SERIAL_PORT, "/dev/ttyUSB0"));
+		microcodeDefinesText.setText(workspacePrefs.get(JopPreferences.MICROCODE_DEFINES, "SERIAL"));
+		mainClassText.setText(workspacePrefs.get(JopPreferences.MAIN_CLASS, ""));
+		outputDirText.setText(workspacePrefs.get(JopPreferences.JOP_OUTPUT_DIR, "build"));
 		super.performDefaults();
 	}
 

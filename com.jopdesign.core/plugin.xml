@@ -27,4 +27,19 @@
         <initializer class="com.jopdesign.core.preferences.JopPreferenceInitializer"/>
     </extension>
 
+    <!-- JOP Runtime Classpath Container -->
+    <extension point="org.eclipse.jdt.core.classpathContainerInitializer">
+        <classpathContainerInitializer
+            id="com.jopdesign.core.JOP_CLASSPATH_CONTAINER"
+            class="com.jopdesign.core.classpath.JopClasspathContainerInitializer"/>
+    </extension>
+
+    <!-- JOP Microcode Problem Marker -->
+    <extension point="org.eclipse.core.resources.markers"
+               id="microcodeProblem"
+               name="JOP Microcode Problem">
+        <super type="org.eclipse.core.resources.problemmarker"/>
+        <persistent value="true"/>
+    </extension>
+
 </plugin>

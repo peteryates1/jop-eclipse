@@ -19,6 +19,41 @@
             name="Toggle JOP Nature"
             description="Add or remove the JOP nature from a Java project">
         </command>
+        <command
+            id="com.jopdesign.ui.synthesizeFpga"
+            name="Synthesize FPGA"
+            description="Run SpinalHDL generation and FPGA synthesis for the selected JOP project">
+        </command>
+        <command
+            id="com.jopdesign.ui.programFpga"
+            name="Program FPGA"
+            description="Program the FPGA with the synthesized bitstream via JTAG">
+        </command>
+        <command
+            id="com.jopdesign.ui.downloadApp"
+            name="Download Application"
+            description="Download the .jop application to the board via serial port">
+        </command>
+        <command
+            id="com.jopdesign.ui.startMonitor"
+            name="Start Monitor"
+            description="Open a UART monitor to view serial output from the JOP board">
+        </command>
+        <command
+            id="com.jopdesign.ui.runJopSim"
+            name="Run JopSim"
+            description="Run the JOP Java-level simulator on the built .jop application">
+        </command>
+        <command
+            id="com.jopdesign.ui.runRtlSim"
+            name="Run RTL Simulation"
+            description="Run a SpinalHDL/Verilator RTL simulation of the JOP processor">
+        </command>
+        <command
+            id="com.jopdesign.ui.generateDrivers"
+            name="Generate IO Drivers"
+            description="Generate Java driver stubs and pin constraints for selected IO peripherals">
+        </command>
     </extension>
 
     <!-- Handler for toggle nature command -->
@@ -26,6 +61,34 @@
         <handler
             class="com.jopdesign.ui.actions.ToggleJopNatureHandler"
             commandId="com.jopdesign.ui.toggleNature">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.SynthesizeFpgaHandler"
+            commandId="com.jopdesign.ui.synthesizeFpga">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.ProgramFpgaHandler"
+            commandId="com.jopdesign.ui.programFpga">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.DownloadAppHandler"
+            commandId="com.jopdesign.ui.downloadApp">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.StartMonitorHandler"
+            commandId="com.jopdesign.ui.startMonitor">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.RunJopSimHandler"
+            commandId="com.jopdesign.ui.runJopSim">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.RunRtlSimHandler"
+            commandId="com.jopdesign.ui.runRtlSim">
+        </handler>
+        <handler
+            class="com.jopdesign.ui.actions.GenerateDriversHandler"
+            commandId="com.jopdesign.ui.generateDrivers">
         </handler>
     </extension>
 
@@ -52,12 +115,81 @@
         </menuContribution>
     </extension>
 
+    <!-- JOP submenu on project context menu -->
+    <extension point="org.eclipse.ui.menus">
+        <menuContribution
+            allPopups="false"
+            locationURI="popup:org.eclipse.ui.popup.any?after=additions">
+            <menu
+                id="com.jopdesign.ui.jopMenu"
+                label="JOP">
+                <visibleWhen checkEnabled="false">
+                    <with variable="selection">
+                        <iterate ifEmpty="false">
+                            <adapt type="org.eclipse.core.resources.IProject">
+                                <test property="org.eclipse.core.resources.projectNature"
+                                      value="com.jopdesign.core.jopNature"/>
+                            </adapt>
+                        </iterate>
+                    </with>
+                </visibleWhen>
+                <command
+                    commandId="com.jopdesign.ui.synthesizeFpga"
+                    label="Synthesize FPGA"
+                    style="push"/>
+                <command
+                    commandId="com.jopdesign.ui.programFpga"
+                    label="Program FPGA"
+                    style="push"/>
+                <separator name="deploySeparator" visible="true"/>
+                <command
+                    commandId="com.jopdesign.ui.downloadApp"
+                    label="Download Application"
+                    style="push"/>
+                <command
+                    commandId="com.jopdesign.ui.startMonitor"
+                    label="Start Monitor"
+                    style="push"/>
+                <separator name="simSeparator" visible="true"/>
+                <command
+                    commandId="com.jopdesign.ui.runJopSim"
+                    label="Run JopSim"
+                    style="push"/>
+                <command
+                    commandId="com.jopdesign.ui.runRtlSim"
+                    label="Run RTL Simulation"
+                    style="push"/>
+                <separator name="ioSeparator" visible="true"/>
+                <command
+                    commandId="com.jopdesign.ui.generateDrivers"
+                    label="Generate IO Drivers"
+                    style="push"/>
+            </menu>
+        </menuContribution>
+    </extension>
+
     <!-- JOP Project Properties page -->
     <extension point="org.eclipse.ui.propertyPages">
         <page
             id="com.jopdesign.ui.properties.jopPropertyPage"
             name="JOP"
             class="com.jopdesign.ui.properties.JopPropertyPage">
+            <enabledWhen>
+                <adapt type="org.eclipse.core.resources.IProject">
+                    <test property="org.eclipse.core.resources.projectNature"
+                          value="com.jopdesign.core.jopNature"/>
+                </adapt>
+            </enabledWhen>
+        </page>
+    </extension>
+
+    <!-- JOP Board Configuration sub-page (under JOP project properties) -->
+    <extension point="org.eclipse.ui.propertyPages">
+        <page
+            id="com.jopdesign.ui.properties.jopBoardPropertyPage"
+            name="Board Configuration"
+            class="com.jopdesign.ui.properties.JopBoardPropertyPage"
+            category="com.jopdesign.ui.properties.jopPropertyPage">
             <enabledWhen>
                 <adapt type="org.eclipse.core.resources.IProject">
                     <test property="org.eclipse.core.resources.projectNature"
