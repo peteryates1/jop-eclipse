@@ -77,9 +77,9 @@ public record BoardDefinition(
 			throw new IllegalArgumentException(
 					"methodCacheSize must be 256-16384, got " + methodCacheSize);
 		}
-		if (stackBufferSize < 8 || stackBufferSize > 256) {
+		if (stackBufferSize < 8 || stackBufferSize > 192) {
 			throw new IllegalArgumentException(
-					"stackBufferSize must be 8-256, got " + stackBufferSize);
+					"stackBufferSize must be 8-192, got " + stackBufferSize);
 		}
 	}
 }

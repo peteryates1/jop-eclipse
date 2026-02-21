@@ -30,7 +30,7 @@ public final class ScalaConfigGenerator {
 	 */
 	public static String generate(IProject project) {
 		int methodCacheSize = getInt(project, JopPreferences.METHOD_CACHE_SIZE, 4096);
-		int stackBufferSize = getInt(project, JopPreferences.STACK_BUFFER_SIZE, 64);
+		int stackBufferSize = getInt(project, JopPreferences.STACK_BUFFER_SIZE, 192);
 		boolean useOcache = getBool(project, JopPreferences.USE_OCACHE, true);
 		int ocacheWayBits = getInt(project, JopPreferences.OCACHE_WAY_BITS, 4);
 		boolean useAcache = getBool(project, JopPreferences.USE_ACACHE, true);

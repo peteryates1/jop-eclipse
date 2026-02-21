@@ -39,7 +39,7 @@ public final class JopPreferences {
 	/** Method cache size in bytes (256-16384) */
 	public static final String METHOD_CACHE_SIZE = "jop.board.method.cache.size";
 
-	/** On-chip stack buffer size in words (8-256) */
+	/** On-chip stack buffer size in words (8-192, default 192 = 256 total minus 64 reserved) */
 	public static final String STACK_BUFFER_SIZE = "jop.board.stack.buffer.size";
 
 	/** Enable object field cache */
@@ -73,7 +73,7 @@ public final class JopPreferences {
 	/** Path to SBT executable (for SpinalHDL Verilog generation) */
 	public static final String SBT_PATH = "jop.sbt.path";
 
-	/** Path to Quartus bin directory (e.g., /opt/altera/25.1/quartus/bin) */
+	/** Path to Quartus install directory (e.g., /opt/altera/25.1/quartus) */
 	public static final String QUARTUS_PATH = "jop.quartus.path";
 
 	/** Path to Vivado installation (e.g., /opt/xilinx/2025.2/Vivado) */
@@ -89,6 +89,11 @@ public final class JopPreferences {
 	 * Value: slot number (2 or 3).
 	 */
 	public static final String IO_SLOT_PREFIX = "jop.board.io.slot.";
+
+	// ---- JDK ----
+
+	/** Path to JDK 1.6 home (e.g., /opt/jdk1.6.0_45) — used to compile JOP application code */
+	public static final String JDK6_HOME = "jop.jdk6.home";
 
 	// ---- Build ----
 

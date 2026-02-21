@@ -154,7 +154,7 @@ public class JopToolchain {
 	}
 
 	/**
-	 * Resolve the Quartus bin directory from project preferences.
+	 * Resolve the Quartus install directory from project preferences.
 	 * Returns null if not configured.
 	 */
 	public static File getQuartusDir(IProject project) {

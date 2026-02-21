@@ -39,6 +39,11 @@ public class JopPreferencePage extends FieldEditorPreferencePage
 				"JOP Home:",
 				getFieldEditorParent()));
 
+		addField(new DirectoryFieldEditor(
+				JopPreferences.JDK6_HOME,
+				"JDK 1.6 Home:",
+				getFieldEditorParent()));
+
 		addField(new StringFieldEditor(
 				JopPreferences.SERIAL_PORT,
 				"Default Serial Port:",
@@ -62,7 +67,7 @@ public class JopPreferencePage extends FieldEditorPreferencePage
 
 		addField(new DirectoryFieldEditor(
 				JopPreferences.QUARTUS_PATH,
-				"Quartus bin Directory:",
+				"Quartus Install Directory:",
 				getFieldEditorParent()));
 
 		addField(new DirectoryFieldEditor(

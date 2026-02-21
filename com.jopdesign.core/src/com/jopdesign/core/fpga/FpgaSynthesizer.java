@@ -334,13 +334,13 @@ public class FpgaSynthesizer {
 
 	/**
 	 * Build a Quartus command line, resolving the tool from the configured
-	 * Quartus bin directory or falling back to PATH.
+	 * Quartus install directory or falling back to PATH.
 	 */
 	private List<String> buildQuartusCommand(File quartusDir, String[] args) {
 		List<String> cmd = new ArrayList<>();
 		String tool = args[0];
 		if (quartusDir != null && quartusDir.isDirectory()) {
-			cmd.add(new File(quartusDir, tool).getAbsolutePath());
+			cmd.add(new File(quartusDir, "bin/" + tool).getAbsolutePath());
 		} else {
 			cmd.add(tool);
 		}

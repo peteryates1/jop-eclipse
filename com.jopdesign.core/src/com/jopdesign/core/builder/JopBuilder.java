@@ -307,11 +307,11 @@ public class JopBuilder extends IncrementalProjectBuilder {
 	// ========================================================================
 
 	/**
-	 * Build the Java application: PreLinker → JOPizer → .jop file.
+	 * Build the Java application: javac 1.6 → PreLinker → JOPizer → .jop file.
 	 *
-	 * <p>Operates on the classes already compiled by JDT (the Java builder runs
-	 * before us). Merges the project's compiled classes with the JOP target
-	 * runtime classes, then runs PreLinker and JOPizer.
+	 * <p>Compiles the project's Java source using JDK 1.6 javac (JOP's BCEL 5.2
+	 * only supports class file version 50.0 / Java 6). The JDT compiler is used
+	 * for in-IDE feedback only — the actual build uses the external JDK 1.6.
 	 */
 	private void buildJava(JopToolchain toolchain, IProgressMonitor monitor) throws CoreException {
 		SubMonitor sub = SubMonitor.convert(monitor, "Building JOP application", 100);
@@ -331,64 +331,155 @@ public class JopBuilder extends IncrementalProjectBuilder {
 			return;
 		}
 
-		// Get JDT output location (compiled .class files)
-		File projectClassesDir = getJdtOutputDir();
-		if (projectClassesDir == null || !projectClassesDir.isDirectory()) {
-			addMarker(getProject(),
-					"No compiled classes found. Build the Java project first.",
-					-1, IMarker.SEVERITY_ERROR);
-			return;
-		}
-
 		// Prepare build output directory
 		String outputDirName = JopProjectPreferences.get(getProject(),
 				JopPreferences.JOP_OUTPUT_DIR, "build");
 		File projectRoot = getProject().getLocation().toFile();
 		File buildDir = new File(projectRoot, outputDirName);
+		File compiledDir = new File(buildDir, "compiled");
 		File stagingDir = new File(buildDir, "classes");
 		File ppDir = new File(buildDir, "pp");
 
-		// Step 1: Stage classes (merge JOP runtime + project classes)
-		sub.subTask("Staging classes");
-		stageClasses(toolchain, projectClassesDir, stagingDir);
+		// Step 1: Compile with JDK 1.6
+		sub.subTask("Compiling (javac 1.6)");
+		boolean ok = compileWithJdk6(toolchain, compiledDir);
 		sub.worked(20);
-		if (sub.isCanceled()) return;
-
-		// Step 2: PreLinker
-		sub.subTask("PreLinking (" + mainClass + ")");
-		boolean ok = runPreLinker(toolchain, stagingDir, ppDir, mainClass);
-		sub.worked(40);
 		if (!ok || sub.isCanceled()) return;
 
-		// Step 3: JOPizer
+		// Step 2: Stage classes (merge JOP runtime + compiled classes)
+		sub.subTask("Staging classes");
+		stageClasses(toolchain, compiledDir, stagingDir);
+		sub.worked(10);
+		if (sub.isCanceled()) return;
+
+		// Step 3: PreLinker
+		sub.subTask("PreLinking (" + mainClass + ")");
+		ok = runPreLinker(toolchain, stagingDir, ppDir, mainClass);
+		sub.worked(35);
+		if (!ok || sub.isCanceled()) return;
+
+		// Step 4: JOPizer
 		String simpleClassName = mainClass.substring(mainClass.lastIndexOf('.') + 1);
 		File jopFile = new File(buildDir, simpleClassName + ".jop");
 		sub.subTask("JOPizing → " + jopFile.getName());
 		runJOPizer(toolchain, new File(ppDir, "classes"), jopFile, mainClass);
-		sub.worked(40);
+		sub.worked(35);
 
 		// Refresh so Eclipse sees the generated files
 		getProject().refreshLocal(IResource.DEPTH_INFINITE, null);
 	}
 
 	/**
-	 * Get the JDT compiler output directory for this project.
+	 * Compile the project's Java source files using JDK 1.6 javac.
+	 *
+	 * <p>JOP's BCEL 5.2 only supports class file version 50.0 (Java 6),
+	 * so we must compile with the external JDK 1.6 javac rather than using
+	 * the class files produced by the Eclipse JDT compiler.
 	 */
-	private File getJdtOutputDir() {
+	private boolean compileWithJdk6(JopToolchain toolchain, File outputDir) throws CoreException {
+		String jdk6Home = JopProjectPreferences.get(getProject(),
+				JopPreferences.JDK6_HOME, "/opt/jdk1.6.0_45");
+		File javac = new File(jdk6Home, "bin/javac");
+		if (!javac.isFile()) {
+			addMarker(getProject(),
+					"JDK 1.6 javac not found: " + javac
+					+ " — set JDK 1.6 Home in Preferences > JOP",
+					-1, IMarker.SEVERITY_ERROR);
+			return false;
+		}
+
+		// Clean and create output dir
+		try {
+			if (outputDir.exists()) {
+				deleteRecursive(outputDir.toPath());
+			}
+			outputDir.mkdirs();
+		} catch (IOException e) {
+			throw new CoreException(new Status(IStatus.ERROR, JopCorePlugin.PLUGIN_ID,
+					"Failed to prepare compile output dir", e));
+		}
+
+		// Collect Java source files from project source folders
+		List<File> sourceFiles = new ArrayList<>();
 		try {
 			IJavaProject javaProject = JavaCore.create(getProject());
-			if (javaProject == null || !javaProject.exists()) {
-				return null;
-			}
-			IPath outputLocation = javaProject.getOutputLocation();
-			IFolder outputFolder = getProject().getWorkspace().getRoot().getFolder(outputLocation);
-			if (outputFolder.getLocation() != null) {
-				return outputFolder.getLocation().toFile();
+			if (javaProject == null) return false;
+
+			for (org.eclipse.jdt.core.IClasspathEntry entry : javaProject.getRawClasspath()) {
+				if (entry.getEntryKind() == org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE) {
+					IPath srcPath = entry.getPath();
+					// srcPath is workspace-relative (e.g., /JopDemo/src)
+					IFolder srcFolder = getProject().getWorkspace().getRoot().getFolder(srcPath);
+					if (srcFolder.getLocation() != null) {
+						collectJavaFiles(srcFolder.getLocation().toFile(), sourceFiles);
+					}
+				}
 			}
 		} catch (CoreException e) {
-			LOG.error("Failed to get JDT output location", e);
+			LOG.warn("Failed to resolve source folders: " + e.getMessage());
+			// Fallback: try project/src
+			File fallbackSrc = new File(getProject().getLocation().toFile(), "src");
+			if (fallbackSrc.isDirectory()) {
+				collectJavaFiles(fallbackSrc, sourceFiles);
+			}
 		}
-		return null;
+
+		if (sourceFiles.isEmpty()) {
+			LOG.info("No Java source files found to compile");
+			return true;
+		}
+
+		// Build classpath: JOP target classes
+		String bootClasspath = toolchain.getTargetClasses().getAbsolutePath();
+
+		List<String> cmd = new ArrayList<>();
+		cmd.add(javac.getAbsolutePath());
+		cmd.add("-source");
+		cmd.add("1.6");
+		cmd.add("-target");
+		cmd.add("1.6");
+		cmd.add("-bootclasspath");
+		cmd.add(bootClasspath);
+		cmd.add("-d");
+		cmd.add(outputDir.getAbsolutePath());
+		for (File src : sourceFiles) {
+			cmd.add(src.getAbsolutePath());
+		}
+
+		LOG.info("JOP javac 1.6: " + sourceFiles.size() + " source files");
+
+		ProcessResult result = runProcess(cmd, getProject().getLocation().toFile());
+
+		if (result.exitCode != 0) {
+			// Report javac errors
+			String errors = result.stderr.isEmpty() ? result.stdout : result.stderr;
+			for (String line : errors.split("\n")) {
+				line = line.trim();
+				if (line.isEmpty() || line.startsWith("Note:") || line.matches("\\d+ errors?")) continue;
+				if (line.contains(": error:") || line.contains(": warning:")) {
+					addMarker(getProject(), "javac: " + line, -1, IMarker.SEVERITY_ERROR);
+				}
+			}
+			addMarker(getProject(),
+					"JDK 1.6 compilation failed (exit " + result.exitCode + ")",
+					-1, IMarker.SEVERITY_ERROR);
+			return false;
+		}
+
+		return true;
+	}
+
+	private void collectJavaFiles(File dir, List<File> result) {
+		if (!dir.isDirectory()) return;
+		File[] files = dir.listFiles();
+		if (files == null) return;
+		for (File f : files) {
+			if (f.isDirectory()) {
+				collectJavaFiles(f, result);
+			} else if (f.getName().endsWith(".java")) {
+				result.add(f);
+			}
+		}
 	}
 
 	/**
@@ -530,16 +621,22 @@ public class JopBuilder extends IncrementalProjectBuilder {
 			line = line.trim();
 			if (line.isEmpty()) continue;
 
-			// Log info lines
-			if (!containsErrorKeyword(line) && !line.startsWith("at ") && !line.startsWith("Caused by:")) {
-				if (line.contains("KB") || line.contains("methods") || line.contains("classes")) {
-					LOG.info(toolName + ": " + line);
-				}
+			// Skip stack trace continuation lines
+			if (line.startsWith("at ") || line.startsWith("Caused by:")) {
 				continue;
 			}
 
-			// Report errors (but skip stack trace continuation lines)
-			if (line.startsWith("at ") || line.startsWith("Caused by:")) {
+			// Skip class-listing lines (JOPizer logs loaded class names)
+			if (line.startsWith("Class ") || line.startsWith("[")) {
+				LOG.info(toolName + ": " + line);
+				continue;
+			}
+
+			// Log informational lines
+			if (!containsErrorKeyword(line)) {
+				if (line.contains("KB") || line.contains("methods") || line.contains("classes")) {
+					LOG.info(toolName + ": " + line);
+				}
 				continue;
 			}
 

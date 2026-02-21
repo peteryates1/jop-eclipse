@@ -29,9 +29,9 @@ public class BoardDefinitionTest {
 
 	@Test
 	public void testMaximumValues() {
-		BoardDefinition board = createBoard(16384, 256);
+		BoardDefinition board = createBoard(16384, 192);
 		assertEquals(16384, board.methodCacheSize());
-		assertEquals(256, board.stackBufferSize());
+		assertEquals(192, board.stackBufferSize());
 	}
 
 	@Test(expected = IllegalArgumentException.class)

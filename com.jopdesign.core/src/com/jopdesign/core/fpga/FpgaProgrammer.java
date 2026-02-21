@@ -130,7 +130,7 @@ public class FpgaProgrammer {
 		File quartusDir = JopToolchain.getQuartusDir(project);
 		List<String> cmd = new ArrayList<>();
 		if (quartusDir != null && quartusDir.isDirectory()) {
-			cmd.add(new File(quartusDir, "quartus_pgm").getAbsolutePath());
+			cmd.add(new File(quartusDir, "bin/quartus_pgm").getAbsolutePath());
 		} else {
 			cmd.add("quartus_pgm");
 		}

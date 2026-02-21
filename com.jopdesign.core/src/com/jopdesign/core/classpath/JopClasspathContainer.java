@@ -58,12 +58,12 @@ public class JopClasspathContainer implements IClasspathContainer {
 
 	@Override
 	public String getDescription() {
-		return "JOP Runtime";
+		return "JOP System Library";
 	}
 
 	@Override
 	public int getKind() {
-		return K_APPLICATION;
+		return K_DEFAULT_SYSTEM;
 	}
 
 	@Override

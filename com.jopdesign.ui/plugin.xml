@@ -208,6 +208,28 @@
         </page>
     </extension>
 
+    <!-- Content type for .jop files (text format, // line comments) -->
+    <extension point="org.eclipse.core.contenttype.contentTypes">
+        <content-type
+            id="com.jopdesign.ui.jopContent"
+            name="JOP Application Image"
+            base-type="org.eclipse.core.runtime.text"
+            file-extensions="jop">
+        </content-type>
+    </extension>
+
+    <!-- Associate .jop files with the built-in text editor -->
+    <extension point="org.eclipse.ui.editors">
+        <editor
+            id="com.jopdesign.ui.editors.jopTextEditor"
+            name="JOP File Viewer"
+            icon="icons/jop-16.png"
+            extensions="jop"
+            class="com.jopdesign.ui.editors.JopTextEditor"
+            default="true">
+        </editor>
+    </extension>
+
     <!-- Microcode Debug launch configuration type -->
     <extension point="org.eclipse.debug.core.launchConfigurationTypes">
         <launchConfigurationType

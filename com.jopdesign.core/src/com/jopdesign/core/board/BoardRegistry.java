@@ -139,7 +139,7 @@ public final class BoardRegistry {
 				getString(obj, "topModule"),
 				getString(obj, "fpgaDir"),
 				getInt(obj, "methodCacheSize", 4096),
-				getInt(obj, "stackBufferSize", 64),
+				getInt(obj, "stackBufferSize", 192),
 				getBool(obj, "useOcache", true),
 				getInt(obj, "ocacheWayBits", 4),
 				getBool(obj, "useAcache", true),
