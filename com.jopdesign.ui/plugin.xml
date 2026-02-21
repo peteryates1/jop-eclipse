@@ -303,4 +303,113 @@
         </shortcut>
     </extension>
 
+    <!-- ========== JOP Application (unified run/debug) ========== -->
+
+    <!-- JOP Application launch configuration type -->
+    <extension point="org.eclipse.debug.core.launchConfigurationTypes">
+        <launchConfigurationType
+            id="com.jopdesign.ui.launch.jopApplication"
+            name="JOP Application"
+            delegate="com.jopdesign.ui.launch.JopLaunchDelegate"
+            modes="run,debug"
+            public="true">
+        </launchConfigurationType>
+    </extension>
+
+    <!-- Source locator for JOP Application debug -->
+    <extension point="org.eclipse.debug.core.sourceLocators">
+        <sourceLocator
+            id="com.jopdesign.ui.launch.jopSourceLocator"
+            name="JOP Source Locator"
+            class="com.jopdesign.ui.launch.JopSourceLocator">
+        </sourceLocator>
+    </extension>
+
+    <!-- Tab group for JOP Application -->
+    <extension point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+        <launchConfigurationTabGroup
+            id="com.jopdesign.ui.launch.jopTabGroup"
+            type="com.jopdesign.ui.launch.jopApplication"
+            class="com.jopdesign.ui.launch.JopLaunchTabGroup">
+        </launchConfigurationTabGroup>
+    </extension>
+
+    <!-- Launch configuration type image for JOP Application -->
+    <extension point="org.eclipse.debug.ui.launchConfigurationTypeImages">
+        <launchConfigurationTypeImage
+            id="com.jopdesign.ui.launch.jopApplicationImage"
+            configTypeID="com.jopdesign.ui.launch.jopApplication"
+            icon="icons/jop-16.png">
+        </launchConfigurationTypeImage>
+    </extension>
+
+    <!-- Debug model presentation for unified JOP debug -->
+    <extension point="org.eclipse.debug.ui.debugModelPresentations">
+        <debugModelPresentation
+            id="com.jopdesign.debug"
+            class="com.jopdesign.ui.launch.JopDebugModelPresentation">
+        </debugModelPresentation>
+    </extension>
+
+    <!-- Run/Debug As > JOP Application shortcut -->
+    <extension point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+            id="com.jopdesign.ui.launch.jopShortcut"
+            label="JOP Application"
+            class="com.jopdesign.ui.launch.JopLaunchShortcut"
+            modes="run,debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <or>
+                                <adapt type="org.eclipse.core.resources.IFile">
+                                    <test property="org.eclipse.core.resources.extension" value="asm"/>
+                                </adapt>
+                                <adapt type="org.eclipse.core.resources.IFile">
+                                    <test property="org.eclipse.core.resources.extension" value="mic"/>
+                                </adapt>
+                            </or>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+        </shortcut>
+    </extension>
+
+    <!-- ========== JOP Debug Perspective and Views ========== -->
+
+    <!-- JOP view category -->
+    <extension point="org.eclipse.ui.views">
+        <category
+            id="com.jopdesign.ui.views"
+            name="JOP">
+        </category>
+        <view
+            id="com.jopdesign.ui.views.registersView"
+            name="JOP Registers"
+            class="com.jopdesign.ui.views.JopRegistersView"
+            category="com.jopdesign.ui.views"
+            icon="icons/jop-16.png">
+        </view>
+        <view
+            id="com.jopdesign.ui.views.stackView"
+            name="JOP Stack"
+            class="com.jopdesign.ui.views.JopStackView"
+            category="com.jopdesign.ui.views"
+            icon="icons/jop-16.png">
+        </view>
+    </extension>
+
+    <!-- JOP Debug Perspective -->
+    <extension point="org.eclipse.ui.perspectives">
+        <perspective
+            id="com.jopdesign.ui.jopDebugPerspective"
+            name="JOP Debug"
+            class="com.jopdesign.ui.perspectives.JopDebugPerspectiveFactory"
+            icon="icons/jop-16.png">
+        </perspective>
+    </extension>
+
 </plugin>

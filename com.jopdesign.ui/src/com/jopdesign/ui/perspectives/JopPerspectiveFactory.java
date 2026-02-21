@@ -55,5 +55,6 @@ public class JopPerspectiveFactory implements IPerspectiveFactory {
 
 		layout.addPerspectiveShortcut("org.eclipse.jdt.ui.JavaPerspective");
 		layout.addPerspectiveShortcut("org.eclipse.debug.ui.DebugPerspective");
+		layout.addPerspectiveShortcut(JopDebugPerspectiveFactory.PERSPECTIVE_ID);
 	}
 }

@@ -24,4 +24,5 @@ Export-Package: com.jopdesign.ui,
  com.jopdesign.ui.launch,
  com.jopdesign.ui.perspectives,
  com.jopdesign.ui.properties,
- com.jopdesign.ui.actions
+ com.jopdesign.ui.actions,
+ com.jopdesign.ui.views
