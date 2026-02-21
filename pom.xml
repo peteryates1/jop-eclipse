@@ -24,6 +24,7 @@
         <module>com.jopdesign.core</module>
         <module>com.jopdesign.microcode</module>
         <module>com.jopdesign.ui</module>
+        <module>com.jopdesign.tests</module>
         <module>com.jopdesign.feature</module>
         <module>com.jopdesign.site</module>
     </modules>
