@@ -14,7 +14,9 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.swtbot.swt.finder,
  org.eclipse.swtbot.junit4_x,
  org.junit;bundle-version="4.13",
+ org.eclipse.debug.core,
  com.jopdesign.core,
+ com.jopdesign.microcode,
  com.jopdesign.ui
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy

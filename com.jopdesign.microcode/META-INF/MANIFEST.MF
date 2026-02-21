@@ -11,9 +11,12 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.ui.editors,
  org.eclipse.jface.text,
  org.eclipse.ui.views,
+ org.eclipse.debug.core,
+ org.eclipse.debug.ui,
  com.jopdesign.core
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Export-Package: com.jopdesign.microcode,
+ com.jopdesign.microcode.debug,
  com.jopdesign.microcode.editor,
  com.jopdesign.microcode.syntax

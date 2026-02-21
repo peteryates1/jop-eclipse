@@ -23,6 +23,7 @@ public class MicrocodeEditor extends TextEditor {
 	protected void initializeEditor() {
 		super.initializeEditor();
 		setEditorContextMenuId("#MicrocodeEditorContext");
+		setRulerContextMenuId("#MicrocodeRulerContext");
 	}
 
 	@SuppressWarnings("unchecked")

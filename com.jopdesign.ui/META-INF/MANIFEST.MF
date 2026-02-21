@@ -12,10 +12,14 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.ui.console,
  org.eclipse.jdt.core,
  org.eclipse.jdt.ui,
- com.jopdesign.core
+ org.eclipse.debug.core,
+ org.eclipse.debug.ui,
+ com.jopdesign.core,
+ com.jopdesign.microcode
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Bundle-ActivationPolicy: lazy
 Export-Package: com.jopdesign.ui,
+ com.jopdesign.ui.launch,
  com.jopdesign.ui.perspectives,
  com.jopdesign.ui.properties,
  com.jopdesign.ui.actions

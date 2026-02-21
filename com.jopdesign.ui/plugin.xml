@@ -208,4 +208,77 @@
         </page>
     </extension>
 
+    <!-- Microcode Debug launch configuration type -->
+    <extension point="org.eclipse.debug.core.launchConfigurationTypes">
+        <launchConfigurationType
+            id="com.jopdesign.ui.launch.microcodeDebug"
+            name="JOP Microcode Debug"
+            delegate="com.jopdesign.ui.launch.MicrocodeLaunchDelegate"
+            modes="debug"
+            public="true">
+        </launchConfigurationType>
+    </extension>
+
+    <!-- Source locator for microcode debug -->
+    <extension point="org.eclipse.debug.core.sourceLocators">
+        <sourceLocator
+            id="com.jopdesign.ui.launch.microcodeSourceLocator"
+            name="JOP Microcode Source Locator"
+            class="com.jopdesign.ui.launch.MicrocodeSourceLocator">
+        </sourceLocator>
+    </extension>
+
+    <!-- Launch configuration tab group -->
+    <extension point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+        <launchConfigurationTabGroup
+            id="com.jopdesign.ui.launch.microcodeTabGroup"
+            type="com.jopdesign.ui.launch.microcodeDebug"
+            class="com.jopdesign.ui.launch.MicrocodeLaunchTabGroup">
+        </launchConfigurationTabGroup>
+    </extension>
+
+    <!-- Launch configuration type image -->
+    <extension point="org.eclipse.debug.ui.launchConfigurationTypeImages">
+        <launchConfigurationTypeImage
+            id="com.jopdesign.ui.launch.microcodeDebugImage"
+            configTypeID="com.jopdesign.ui.launch.microcodeDebug"
+            icon="icons/jop-16.png">
+        </launchConfigurationTypeImage>
+    </extension>
+
+    <!-- Debug model presentation for microcode -->
+    <extension point="org.eclipse.debug.ui.debugModelPresentations">
+        <debugModelPresentation
+            id="com.jopdesign.microcode.debug"
+            class="com.jopdesign.ui.launch.MicrocodeDebugModelPresentation">
+        </debugModelPresentation>
+    </extension>
+
+    <!-- Debug As > JOP Microcode launch shortcut -->
+    <extension point="org.eclipse.debug.ui.launchShortcuts">
+        <shortcut
+            id="com.jopdesign.ui.launch.microcodeShortcut"
+            label="JOP Microcode Debug"
+            class="com.jopdesign.ui.launch.MicrocodeLaunchShortcut"
+            modes="debug">
+            <contextualLaunch>
+                <enablement>
+                    <with variable="selection">
+                        <count value="1"/>
+                        <iterate>
+                            <or>
+                                <adapt type="org.eclipse.core.resources.IFile">
+                                    <test property="org.eclipse.core.resources.extension" value="asm"/>
+                                </adapt>
+                                <adapt type="org.eclipse.core.resources.IFile">
+                                    <test property="org.eclipse.core.resources.extension" value="mic"/>
+                                </adapt>
+                            </or>
+                        </iterate>
+                    </with>
+                </enablement>
+            </contextualLaunch>
+        </shortcut>
+    </extension>
+
 </plugin>

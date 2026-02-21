@@ -20,4 +20,5 @@ Export-Package: com.jopdesign.core,
  com.jopdesign.core.builder,
  com.jopdesign.core.preferences,
  com.jopdesign.core.sim,
+ com.jopdesign.core.sim.microcode,
  com.jopdesign.core.toolchain
