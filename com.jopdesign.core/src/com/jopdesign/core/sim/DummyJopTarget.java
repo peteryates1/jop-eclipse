@@ -1,6 +1,8 @@
 package com.jopdesign.core.sim;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -21,6 +23,15 @@ public class DummyJopTarget implements IJopTarget {
 	private int cannedJPC = 0;
 	private int cannedSourceLine = 1;
 
+	private static final int INITIAL_PC = 0;
+	private static final int INITIAL_SP = 4;
+	private static final int INITIAL_A = 42;
+	private static final int INITIAL_B = 7;
+
+	/** Breakpoint slot management. */
+	private final Map<Integer, JopBreakpointInfo> breakpointSlots = new HashMap<>();
+	private int nextSlot = 0;
+
 	private static final int[] CANNED_STACK = { 100, 200, 300, 400, 500, 600, 700, 800 };
 	private static final String[] CANNED_MNEMONICS = {
 		"nop", "dup", "add", "pop", "ld0", "st0", "ldi", "jmp"
@@ -39,38 +50,52 @@ public class DummyJopTarget implements IJopTarget {
 	@Override
 	public void connect() throws JopTargetException {
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state);
+		fireStateChanged(state, JopSuspendReason.MANUAL);
 	}
 
 	@Override
 	public void disconnect() throws JopTargetException {
 		state = JopTargetState.TERMINATED;
-		fireStateChanged(state);
+		fireStateChanged(state, null);
 	}
 
 	@Override
 	public void resume() throws JopTargetException {
 		checkNotTerminated();
 		state = JopTargetState.RUNNING;
-		fireStateChanged(state);
+		fireStateChanged(state, null);
 		// Immediately hit a "breakpoint"
 		cannedPC++;
 		cannedSourceLine++;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state);
+		fireStateChanged(state, JopSuspendReason.BREAKPOINT);
 	}
 
 	@Override
 	public void suspend() throws JopTargetException {
 		checkNotTerminated();
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state);
+		fireStateChanged(state, JopSuspendReason.MANUAL);
 	}
 
 	@Override
 	public void terminate() throws JopTargetException {
 		state = JopTargetState.TERMINATED;
-		fireStateChanged(state);
+		fireStateChanged(state, null);
+	}
+
+	@Override
+	public void reset() throws JopTargetException {
+		cannedPC = INITIAL_PC;
+		cannedSP = INITIAL_SP;
+		cannedA = INITIAL_A;
+		cannedB = INITIAL_B;
+		cannedVP = 0;
+		cannedAR = 0;
+		cannedJPC = 0;
+		cannedSourceLine = 1;
+		state = JopTargetState.SUSPENDED;
+		fireStateChanged(state, JopSuspendReason.RESET);
 	}
 
 	@Override
@@ -80,7 +105,7 @@ public class DummyJopTarget implements IJopTarget {
 		cannedA += 3;
 		cannedSourceLine++;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state);
+		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE);
 	}
 
 	@Override
@@ -91,7 +116,7 @@ public class DummyJopTarget implements IJopTarget {
 		cannedA += 5;
 		cannedSourceLine += 2;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state);
+		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE);
 	}
 
 	@Override
@@ -103,7 +128,7 @@ public class DummyJopTarget implements IJopTarget {
 	public JopRegisters readRegisters() throws JopTargetException {
 		return new JopRegisters(
 				cannedA, cannedB, cannedPC, cannedSP, cannedVP, cannedAR, cannedJPC,
-				0, 0, 0L,
+				0,
 				0, 0, 0, 0);
 	}
 
@@ -125,14 +150,14 @@ public class DummyJopTarget implements IJopTarget {
 	}
 
 	@Override
-	public void writeRegister(String name, int value) throws JopTargetException {
-		switch (name) {
-			case "a" -> cannedA = value;
-			case "b" -> cannedB = value;
-			case "sp" -> cannedSP = value;
-			case "vp" -> cannedVP = value;
-			case "pc" -> cannedPC = value;
-			default -> throw new JopTargetException("Unknown register: " + name);
+	public void writeRegister(JopRegister reg, int value) throws JopTargetException {
+		switch (reg) {
+			case A -> cannedA = value;
+			case B -> cannedB = value;
+			case SP -> cannedSP = value;
+			case VP -> cannedVP = value;
+			case PC -> cannedPC = value;
+			default -> throw new JopTargetException("Register not writable: " + reg.displayName());
 		}
 	}
 
@@ -142,13 +167,30 @@ public class DummyJopTarget implements IJopTarget {
 	}
 
 	@Override
-	public void addBreakpoint(int sourceLine) throws JopTargetException {
-		// No-op for dummy
+	public int setBreakpoint(JopBreakpointType type, int address) throws JopTargetException {
+		int slot = nextSlot++;
+		breakpointSlots.put(slot, new JopBreakpointInfo(slot, type, address));
+		return slot;
 	}
 
 	@Override
-	public void removeBreakpoint(int sourceLine) throws JopTargetException {
-		// No-op for dummy
+	public void clearBreakpoint(int slot) throws JopTargetException {
+		breakpointSlots.remove(slot);
+	}
+
+	@Override
+	public JopBreakpointInfo[] getBreakpoints() {
+		return breakpointSlots.values().toArray(new JopBreakpointInfo[0]);
+	}
+
+	@Override
+	public JopTargetInfo getTargetInfo() {
+		return new JopTargetInfo(1, 4, 128, 1024, "dummy");
+	}
+
+	@Override
+	public int resolveLineToAddress(int sourceLine) {
+		return sourceLine; // Identity for dummy
 	}
 
 	@Override
@@ -182,9 +224,9 @@ public class DummyJopTarget implements IJopTarget {
 		}
 	}
 
-	private void fireStateChanged(JopTargetState newState) {
+	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason) {
 		for (IJopTargetListener l : listeners) {
-			l.stateChanged(newState);
+			l.stateChanged(newState, reason);
 		}
 	}
 }

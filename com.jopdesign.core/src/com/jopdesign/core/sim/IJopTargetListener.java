@@ -9,8 +9,9 @@ public interface IJopTargetListener {
 	 * Called when the target's execution state changes.
 	 *
 	 * @param newState the new state
+	 * @param reason   the suspend reason when newState is SUSPENDED; null otherwise
 	 */
-	void stateChanged(JopTargetState newState);
+	void stateChanged(JopTargetState newState, JopSuspendReason reason);
 
 	/**
 	 * Called when the target produces text output (e.g. UART TX).

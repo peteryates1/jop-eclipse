@@ -105,8 +105,8 @@ public class JopDebugModelTest {
 
 		assertTrue(frame.hasVariables());
 		IVariable[] vars = frame.getVariables();
-		// Should have at least 15 registers + stack entries
-		assertTrue(vars.length >= 15);
+		// Should have at least 12 registers + stack entries
+		assertTrue("Expected at least 12 variables, got " + vars.length, vars.length >= 12);
 
 		assertEquals("A (TOS)", vars[0].getName());
 		assertEquals("B (NOS)", vars[1].getName());
@@ -115,14 +115,11 @@ public class JopDebugModelTest {
 		assertEquals("vp", vars[4].getName());
 		assertEquals("ar", vars[5].getName());
 		assertEquals("jpc", vars[6].getName());
-		assertEquals("mulA", vars[7].getName());
-		assertEquals("mulB", vars[8].getName());
-		assertEquals("mulResultLo", vars[9].getName());
-		assertEquals("mulResultHi", vars[10].getName());
-		assertEquals("memReadAddr", vars[11].getName());
-		assertEquals("memWriteAddr", vars[12].getName());
-		assertEquals("memWriteData", vars[13].getName());
-		assertEquals("memReadData", vars[14].getName());
+		assertEquals("mulResult", vars[7].getName());
+		assertEquals("memReadAddr", vars[8].getName());
+		assertEquals("memWriteAddr", vars[9].getName());
+		assertEquals("memWriteData", vars[10].getName());
+		assertEquals("memReadData", vars[11].getName());
 	}
 
 	@Test
@@ -206,7 +203,7 @@ public class JopDebugModelTest {
 		IStackFrame frame = thread.getTopStackFrame();
 		assertNotNull(frame);
 		IVariable[] vars = frame.getVariables();
-		assertTrue(vars.length >= 15);
+		assertTrue("Expected at least 12 variables, got " + vars.length, vars.length >= 12);
 
 		// Check initial canned A=42
 		String aValue = vars[0].getValue().getValueString();

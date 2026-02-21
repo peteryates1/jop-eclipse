@@ -51,10 +51,7 @@ public class JopStackFrame implements IStackFrame {
 			vars.add(new JopVariable(target, "vp", regs.vp()));
 			vars.add(new JopVariable(target, "ar", regs.ar()));
 			vars.add(new JopVariable(target, "jpc", regs.jpc()));
-			vars.add(new JopVariable(target, "mulA", regs.mulA()));
-			vars.add(new JopVariable(target, "mulB", regs.mulB()));
-			vars.add(new JopVariable(target, "mulResultLo", (int) regs.mulResult()));
-			vars.add(new JopVariable(target, "mulResultHi", (int) (regs.mulResult() >>> 32)));
+			vars.add(new JopVariable(target, "mulResult", regs.mulResult()));
 			vars.add(new JopVariable(target, "memReadAddr", regs.memReadAddr()));
 			vars.add(new JopVariable(target, "memWriteAddr", regs.memWriteAddr()));
 			vars.add(new JopVariable(target, "memWriteData", regs.memWriteData()));

@@ -41,7 +41,7 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 
 	private static final String[] REGISTER_NAMES = {
 		"A (TOS)", "B (NOS)", "pc", "sp", "vp", "ar", "jpc",
-		"mulA", "mulB", "mulResult",
+		"mulResult",
 		"memReadAddr", "memWriteAddr", "memWriteData", "memReadData"
 	};
 
@@ -70,11 +70,7 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 		decCol.setLabelProvider(new ColumnLabelProvider() {
 			@Override
 			public String getText(Object element) {
-				RegisterEntry entry = (RegisterEntry) element;
-				if (entry.isLong) {
-					return Long.toString(entry.longValue);
-				}
-				return Integer.toString(entry.value);
+				return Integer.toString(((RegisterEntry) element).value);
 			}
 
 			@Override
@@ -89,11 +85,7 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 		hexCol.setLabelProvider(new ColumnLabelProvider() {
 			@Override
 			public String getText(Object element) {
-				RegisterEntry entry = (RegisterEntry) element;
-				if (entry.isLong) {
-					return String.format("0x%016X", entry.longValue);
-				}
-				return String.format("0x%08X", entry.value);
+				return String.format("0x%08X", ((RegisterEntry) element).value);
 			}
 
 			@Override
@@ -185,33 +177,25 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 	private RegisterEntry[] buildEntries(JopRegisters regs) {
 		int[] values = {
 			regs.a(), regs.b(), regs.pc(), regs.sp(), regs.vp(), regs.ar(), regs.jpc(),
-			regs.mulA(), regs.mulB(), 0 /* placeholder for mulResult */,
+			regs.mulResult(),
 			regs.memReadAddr(), regs.memWriteAddr(), regs.memWriteData(), regs.memReadData()
 		};
 
 		int[] prevValues = null;
-		long prevMulResult = 0;
 		if (previousRegisters != null) {
 			prevValues = new int[] {
 				previousRegisters.a(), previousRegisters.b(), previousRegisters.pc(),
 				previousRegisters.sp(), previousRegisters.vp(), previousRegisters.ar(),
-				previousRegisters.jpc(), previousRegisters.mulA(), previousRegisters.mulB(),
-				0, previousRegisters.memReadAddr(), previousRegisters.memWriteAddr(),
+				previousRegisters.jpc(), previousRegisters.mulResult(),
+				previousRegisters.memReadAddr(), previousRegisters.memWriteAddr(),
 				previousRegisters.memWriteData(), previousRegisters.memReadData()
 			};
-			prevMulResult = previousRegisters.mulResult();
 		}
 
 		RegisterEntry[] entries = new RegisterEntry[REGISTER_NAMES.length];
 		for (int i = 0; i < REGISTER_NAMES.length; i++) {
-			if (i == 9) {
-				// mulResult is long
-				boolean changed = previousRegisters != null && regs.mulResult() != prevMulResult;
-				entries[i] = new RegisterEntry(REGISTER_NAMES[i], 0, regs.mulResult(), true, changed);
-			} else {
-				boolean changed = prevValues != null && values[i] != prevValues[i];
-				entries[i] = new RegisterEntry(REGISTER_NAMES[i], values[i], 0L, false, changed);
-			}
+			boolean changed = prevValues != null && values[i] != prevValues[i];
+			entries[i] = new RegisterEntry(REGISTER_NAMES[i], values[i], changed);
 		}
 		return entries;
 	}
@@ -236,15 +220,11 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 	private static class RegisterEntry {
 		final String name;
 		final int value;
-		final long longValue;
-		final boolean isLong;
 		final boolean changed;
 
-		RegisterEntry(String name, int value, long longValue, boolean isLong, boolean changed) {
+		RegisterEntry(String name, int value, boolean changed) {
 			this.name = name;
 			this.value = value;
-			this.longValue = longValue;
-			this.isLong = isLong;
 			this.changed = changed;
 		}
 	}

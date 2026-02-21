@@ -75,6 +75,13 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
   - RTL simulation via SpinalHDL/Verilator (4 predefined sim classes)
   - Dedicated "JOP Simulation" console for sim output
   - "Run JopSim" and "Run RTL Simulation" in the JOP context submenu
+  - Unified `IJopTarget` interface aligned with [JOP debug protocol](doc/jop-debug-protocol.md):
+    12-register model, `JopRegister` enum with wire-format IDs, `JopSuspendReason` for halt cause,
+    address-based breakpoints with hardware slot management, `reset()`, `getTargetInfo()`,
+    `resolveLineToAddress()` for host-side line/address mapping
+  - `SimulatorJopTarget` and `DummyJopTarget` implementations; RTL sim and FPGA targets stubbed
+  - `JopDebugTarget` bridges any `IJopTarget` to Eclipse debug framework (no fragile `stepping` flag)
+  - JOP Debug Perspective with Registers view, Stack view, and standard Debug/Variables/Breakpoints
 - **Multi-Core / CMP Configuration** (Phase 7)
   - Enable Multi-Core checkbox with CPU core count spinner (1-8)
   - Memory arbiter type selection (TDMA, Priority, Round-Robin)
@@ -95,7 +102,7 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
 - **Project Properties** (JOP_HOME, JDK 1.6 Home, serial port, microcode defines, main class, output dir, board config)
 - **Workspace Preferences** (Window > Preferences > JOP: includes FPGA tool paths)
 - **Toggle JOP Nature** via project context menu (Configure > Toggle JOP Nature)
-- **Test Suite** (99 tests: JUnit unit tests + SWTBot UI tests)
+- **Test Suite** (177 tests: JUnit unit tests + SWTBot UI tests, JaCoCo coverage reports)
 
 ### Plugin Structure
 
@@ -114,7 +121,7 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
 Requires Java 21 and Maven 3.9+.
 
 ```bash
-# Build (runs all 99 tests)
+# Build (runs all 177 tests, generates JaCoCo coverage)
 mvn clean verify
 
 # Build, install to Eclipse, and launch
@@ -126,6 +133,11 @@ mvn clean verify
 # Build and install only (no launch)
 ./install-and-test.sh --install-only
 ```
+
+After building, coverage reports are at:
+- **HTML**: `com.jopdesign.tests/target/site/jacoco-aggregate/index.html`
+- **CSV**: `com.jopdesign.tests/target/site/jacoco-aggregate.csv`
+- **XML**: `com.jopdesign.tests/target/site/jacoco-aggregate.xml`
 
 The install script creates a writable overlay at `~/eclipse-jop/` with JOP plugin jars and configuration, leaving the base Eclipse installation unmodified.
 

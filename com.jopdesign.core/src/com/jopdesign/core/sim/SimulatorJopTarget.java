@@ -1,6 +1,8 @@
 package com.jopdesign.core.sim;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.jopdesign.core.sim.microcode.ISimulatorListener;
@@ -22,6 +24,15 @@ public class SimulatorJopTarget implements IJopTarget {
 	private MicrocodeSimulator simulator;
 	private JopTargetState state = JopTargetState.NOT_STARTED;
 	private final List<IJopTargetListener> listeners = new CopyOnWriteArrayList<>();
+
+	/** Tracks the reason for the next SUSPENDED event. */
+	private volatile JopSuspendReason pendingSuspendReason = JopSuspendReason.UNKNOWN;
+
+	/** Breakpoint slot management: slot → BreakpointEntry. */
+	private final Map<Integer, BreakpointEntry> breakpointSlots = new HashMap<>();
+	private int nextSlot = 0;
+
+	private record BreakpointEntry(JopBreakpointType type, int address, int sourceLine) {}
 
 	public SimulatorJopTarget(MicrocodeProgram program, int stackSize, int memSize, int initialSP) {
 		this.program = program;
@@ -46,13 +57,20 @@ public class SimulatorJopTarget implements IJopTarget {
 		simulator.load(program);
 		simulator.setSP(initialSP);
 		state = JopTargetState.NOT_STARTED;
+		breakpointSlots.clear();
+		nextSlot = 0;
 
 		simulator.addListener(new ISimulatorListener() {
 			@Override
 			public void stateChanged(SimulatorState newState) {
 				JopTargetState mapped = mapState(newState);
 				state = mapped;
-				fireStateChanged(mapped);
+				JopSuspendReason reason = null;
+				if (mapped == JopTargetState.SUSPENDED) {
+					reason = pendingSuspendReason;
+					pendingSuspendReason = JopSuspendReason.UNKNOWN;
+				}
+				fireStateChanged(mapped, reason);
 			}
 
 			@Override
@@ -72,12 +90,14 @@ public class SimulatorJopTarget implements IJopTarget {
 	@Override
 	public void resume() throws JopTargetException {
 		checkConnected();
+		pendingSuspendReason = JopSuspendReason.BREAKPOINT;
 		simulator.resume();
 	}
 
 	@Override
 	public void suspend() throws JopTargetException {
 		checkConnected();
+		pendingSuspendReason = JopSuspendReason.MANUAL;
 		simulator.suspend();
 	}
 
@@ -88,14 +108,25 @@ public class SimulatorJopTarget implements IJopTarget {
 	}
 
 	@Override
+	public void reset() throws JopTargetException {
+		checkConnected();
+		simulator.load(program);
+		simulator.setSP(initialSP);
+		state = JopTargetState.SUSPENDED;
+		fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.RESET);
+	}
+
+	@Override
 	public void stepMicro() throws JopTargetException {
 		checkConnected();
+		pendingSuspendReason = JopSuspendReason.STEP_COMPLETE;
 		simulator.stepOver();
 	}
 
 	@Override
 	public void stepBytecode() throws JopTargetException {
 		checkConnected();
+		pendingSuspendReason = JopSuspendReason.STEP_COMPLETE;
 		int startJpc = simulator.getJPC();
 		int maxSteps = 10000;
 		int steps = 0;
@@ -125,7 +156,7 @@ public class SimulatorJopTarget implements IJopTarget {
 				simulator.getVP(),
 				simulator.getAR(),
 				simulator.getJPC(),
-				0, 0, 0L, // mulA, mulB, mulResult not directly exposed by simulator
+				0, // mulResult not directly exposed by simulator
 				0, 0, 0, simulator.getMemReadData());
 	}
 
@@ -152,15 +183,15 @@ public class SimulatorJopTarget implements IJopTarget {
 	}
 
 	@Override
-	public void writeRegister(String name, int value) throws JopTargetException {
+	public void writeRegister(JopRegister reg, int value) throws JopTargetException {
 		checkConnected();
-		switch (name) {
-			case "a" -> simulator.setA(value);
-			case "b" -> simulator.setB(value);
-			case "sp" -> simulator.setSP(value);
-			case "vp" -> simulator.setVP(value);
-			case "pc" -> simulator.setPC(value);
-			default -> throw new JopTargetException("Unknown register: " + name);
+		switch (reg) {
+			case A -> simulator.setA(value);
+			case B -> simulator.setB(value);
+			case SP -> simulator.setSP(value);
+			case VP -> simulator.setVP(value);
+			case PC -> simulator.setPC(value);
+			default -> throw new JopTargetException("Register not writable: " + reg.displayName());
 		}
 	}
 
@@ -171,15 +202,47 @@ public class SimulatorJopTarget implements IJopTarget {
 	}
 
 	@Override
-	public void addBreakpoint(int sourceLine) throws JopTargetException {
+	public int setBreakpoint(JopBreakpointType type, int address) throws JopTargetException {
 		checkConnected();
+		if (type == JopBreakpointType.BYTECODE_JPC) {
+			throw new JopTargetException("Simulator does not support JPC breakpoints");
+		}
+		// Convert address to source line for the simulator
+		Integer sourceLine = program.statementToLine().get(address);
+		if (sourceLine == null) {
+			throw new JopTargetException("No source line for address " + address);
+		}
 		simulator.addBreakpoint(sourceLine);
+		int slot = nextSlot++;
+		breakpointSlots.put(slot, new BreakpointEntry(type, address, sourceLine));
+		return slot;
 	}
 
 	@Override
-	public void removeBreakpoint(int sourceLine) throws JopTargetException {
+	public void clearBreakpoint(int slot) throws JopTargetException {
 		checkConnected();
-		simulator.removeBreakpoint(sourceLine);
+		BreakpointEntry entry = breakpointSlots.remove(slot);
+		if (entry != null) {
+			simulator.removeBreakpoint(entry.sourceLine());
+		}
+	}
+
+	@Override
+	public JopBreakpointInfo[] getBreakpoints() {
+		return breakpointSlots.entrySet().stream()
+				.map(e -> new JopBreakpointInfo(e.getKey(), e.getValue().type(), e.getValue().address()))
+				.toArray(JopBreakpointInfo[]::new);
+	}
+
+	@Override
+	public JopTargetInfo getTargetInfo() {
+		return new JopTargetInfo(1, Integer.MAX_VALUE, stackSize, memSize, "simulator");
+	}
+
+	@Override
+	public int resolveLineToAddress(int sourceLine) {
+		Integer addr = program.lineToStatement().get(sourceLine);
+		return addr != null ? addr : -1;
 	}
 
 	@Override
@@ -231,9 +294,9 @@ public class SimulatorJopTarget implements IJopTarget {
 		};
 	}
 
-	private void fireStateChanged(JopTargetState newState) {
+	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason) {
 		for (IJopTargetListener l : listeners) {
-			l.stateChanged(newState);
+			l.stateChanged(newState, reason);
 		}
 	}
 

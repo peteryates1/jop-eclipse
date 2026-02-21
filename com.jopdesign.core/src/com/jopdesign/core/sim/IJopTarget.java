@@ -28,6 +28,9 @@ public interface IJopTarget {
 	/** Terminate execution. */
 	void terminate() throws JopTargetException;
 
+	/** Reset the target to initial state. Fires SUSPENDED with reason RESET. */
+	void reset() throws JopTargetException;
+
 	/** Execute one microcode instruction. */
 	void stepMicro() throws JopTargetException;
 
@@ -46,17 +49,41 @@ public interface IJopTarget {
 	/** Read a region of memory. */
 	JopMemoryData readMemory(int address, int length) throws JopTargetException;
 
-	/** Write a value to a named register. */
-	void writeRegister(String name, int value) throws JopTargetException;
+	/** Write a value to a register. */
+	void writeRegister(JopRegister reg, int value) throws JopTargetException;
 
 	/** Write a value to a memory address. */
 	void writeMemory(int address, int value) throws JopTargetException;
 
-	/** Add a breakpoint at the given source line. */
-	void addBreakpoint(int sourceLine) throws JopTargetException;
+	/**
+	 * Set a breakpoint at the given address.
+	 *
+	 * @param type breakpoint type
+	 * @param address the address to break at
+	 * @return the assigned breakpoint slot index
+	 */
+	int setBreakpoint(JopBreakpointType type, int address) throws JopTargetException;
 
-	/** Remove a breakpoint at the given source line. */
-	void removeBreakpoint(int sourceLine) throws JopTargetException;
+	/**
+	 * Clear a breakpoint by slot index.
+	 *
+	 * @param slot the slot returned by {@link #setBreakpoint}
+	 */
+	void clearBreakpoint(int slot) throws JopTargetException;
+
+	/** Query all active breakpoints. */
+	JopBreakpointInfo[] getBreakpoints();
+
+	/** Query target capabilities and configuration. */
+	JopTargetInfo getTargetInfo();
+
+	/**
+	 * Resolve a 1-based source line number to a microcode address (0-based index).
+	 *
+	 * @param sourceLine 1-based source line
+	 * @return 0-based instruction address, or -1 if not found
+	 */
+	int resolveLineToAddress(int sourceLine);
 
 	/** Provide text input to the target (e.g. UART RX). */
 	void provideInput(String text) throws JopTargetException;

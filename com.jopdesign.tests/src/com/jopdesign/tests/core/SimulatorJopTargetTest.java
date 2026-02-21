@@ -9,10 +9,15 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.jopdesign.core.sim.IJopTargetListener;
+import com.jopdesign.core.sim.JopBreakpointInfo;
+import com.jopdesign.core.sim.JopBreakpointType;
 import com.jopdesign.core.sim.JopMemoryData;
+import com.jopdesign.core.sim.JopRegister;
 import com.jopdesign.core.sim.JopRegisters;
 import com.jopdesign.core.sim.JopStackData;
+import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
+import com.jopdesign.core.sim.JopTargetInfo;
 import com.jopdesign.core.sim.JopTargetState;
 import com.jopdesign.core.sim.SimulatorJopTarget;
 import com.jopdesign.core.sim.microcode.MicrocodeParser;
@@ -98,7 +103,7 @@ public class SimulatorJopTargetTest {
 
 	@Test
 	public void testWriteRegister() throws JopTargetException {
-		target.writeRegister("a", 99);
+		target.writeRegister(JopRegister.A, 99);
 		JopRegisters regs = target.readRegisters();
 		assertEquals(99, regs.a());
 	}
@@ -111,14 +116,17 @@ public class SimulatorJopTargetTest {
 	}
 
 	@Test(expected = JopTargetException.class)
-	public void testWriteUnknownRegister() throws JopTargetException {
-		target.writeRegister("nonexistent", 0);
+	public void testWriteReadOnlyRegister() throws JopTargetException {
+		target.writeRegister(JopRegister.MEM_RD_DATA, 0);
 	}
 
 	@Test
-	public void testBreakpoints() throws JopTargetException, InterruptedException {
-		// Line 6 is "add"
-		target.addBreakpoint(6);
+	public void testSetBreakpointByAddress() throws JopTargetException, InterruptedException {
+		// Line 6 is "add", which is statement index 2 (0-based)
+		int addr = target.resolveLineToAddress(6);
+		assertTrue("Should resolve line 6 to a valid address", addr >= 0);
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
+		assertTrue(slot >= 0);
 		target.resume();
 		Thread.sleep(300);
 		assertEquals(JopTargetState.SUSPENDED, target.getState());
@@ -126,12 +134,29 @@ public class SimulatorJopTargetTest {
 	}
 
 	@Test
-	public void testRemoveBreakpoint() throws JopTargetException, InterruptedException {
-		target.addBreakpoint(6);
-		target.removeBreakpoint(6);
+	public void testClearBreakpoint() throws JopTargetException, InterruptedException {
+		int addr = target.resolveLineToAddress(6);
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
+		target.clearBreakpoint(slot);
 		target.resume();
 		Thread.sleep(300);
 		assertEquals(JopTargetState.TERMINATED, target.getState());
+	}
+
+	@Test
+	public void testGetBreakpoints() throws JopTargetException {
+		int addr = target.resolveLineToAddress(6);
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
+		JopBreakpointInfo[] bps = target.getBreakpoints();
+		assertEquals(1, bps.length);
+		assertEquals(slot, bps[0].slot());
+		assertEquals(JopBreakpointType.MICRO_PC, bps[0].type());
+		assertEquals(addr, bps[0].address());
+	}
+
+	@Test(expected = JopTargetException.class)
+	public void testSetJpcBreakpointNotSupported() throws JopTargetException {
+		target.setBreakpoint(JopBreakpointType.BYTECODE_JPC, 0);
 	}
 
 	@Test
@@ -168,7 +193,7 @@ public class SimulatorJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 				states.add(newState);
 			}
 
@@ -179,6 +204,26 @@ public class SimulatorJopTargetTest {
 
 		target.stepMicro();
 		assertTrue(states.contains(JopTargetState.SUSPENDED));
+	}
+
+	@Test
+	public void testListenerSuspendReason() throws JopTargetException {
+		List<JopSuspendReason> reasons = new ArrayList<>();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				if (reason != null) {
+					reasons.add(reason);
+				}
+			}
+
+			@Override
+			public void outputProduced(String text) {
+			}
+		});
+
+		target.stepMicro();
+		assertTrue(reasons.contains(JopSuspendReason.STEP_COMPLETE));
 	}
 
 	@Test
@@ -198,7 +243,7 @@ public class SimulatorJopTargetTest {
 		List<String> output = new ArrayList<>();
 		outputTarget.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 			}
 
 			@Override
@@ -241,7 +286,7 @@ public class SimulatorJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		IJopTargetListener listener = new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 				states.add(newState);
 			}
 
@@ -273,5 +318,58 @@ public class SimulatorJopTargetTest {
 		// readRegisters should still work (reads from terminated simulator)
 		JopRegisters regs = target.readRegisters();
 		assertNotNull(regs);
+	}
+
+	@Test
+	public void testReset() throws JopTargetException {
+		target.stepMicro(); // ldi val1: A=10
+		target.stepMicro(); // ldi val2: A=20
+		JopRegisters before = target.readRegisters();
+		assertTrue(before.pc() > 0);
+
+		List<JopSuspendReason> reasons = new ArrayList<>();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				if (reason != null) reasons.add(reason);
+			}
+
+			@Override
+			public void outputProduced(String text) {
+			}
+		});
+
+		target.reset();
+		assertEquals(JopTargetState.SUSPENDED, target.getState());
+		JopRegisters after = target.readRegisters();
+		assertEquals(0, after.pc());
+		assertEquals(64, after.sp());
+		assertTrue(reasons.contains(JopSuspendReason.RESET));
+	}
+
+	@Test
+	public void testGetTargetInfo() {
+		JopTargetInfo info = target.getTargetInfo();
+		assertNotNull(info);
+		assertEquals(1, info.numCores());
+		assertEquals(Integer.MAX_VALUE, info.numBreakpoints());
+		assertEquals(1024, info.stackDepth());
+		assertEquals(1024, info.memorySize());
+		assertEquals("simulator", info.version());
+	}
+
+	@Test
+	public void testResolveLineToAddress() {
+		// Line 4 = "ldi val1", should be statement 0
+		int addr = target.resolveLineToAddress(4);
+		assertEquals(0, addr);
+
+		// Line 5 = "ldi val2", should be statement 1
+		addr = target.resolveLineToAddress(5);
+		assertEquals(1, addr);
+
+		// Non-existent line
+		addr = target.resolveLineToAddress(999);
+		assertEquals(-1, addr);
 	}
 }

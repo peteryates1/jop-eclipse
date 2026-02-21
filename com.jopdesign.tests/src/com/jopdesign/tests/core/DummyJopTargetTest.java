@@ -10,10 +10,15 @@ import org.junit.Test;
 
 import com.jopdesign.core.sim.DummyJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
+import com.jopdesign.core.sim.JopBreakpointInfo;
+import com.jopdesign.core.sim.JopBreakpointType;
 import com.jopdesign.core.sim.JopMemoryData;
+import com.jopdesign.core.sim.JopRegister;
 import com.jopdesign.core.sim.JopRegisters;
 import com.jopdesign.core.sim.JopStackData;
+import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
+import com.jopdesign.core.sim.JopTargetInfo;
 import com.jopdesign.core.sim.JopTargetState;
 
 /**
@@ -122,15 +127,15 @@ public class DummyJopTargetTest {
 	@Test
 	public void testWriteRegister() throws JopTargetException {
 		target.connect();
-		target.writeRegister("a", 999);
+		target.writeRegister(JopRegister.A, 999);
 		JopRegisters regs = target.readRegisters();
 		assertEquals(999, regs.a());
 	}
 
 	@Test(expected = JopTargetException.class)
-	public void testWriteUnknownRegister() throws JopTargetException {
+	public void testWriteReadOnlyRegister() throws JopTargetException {
 		target.connect();
-		target.writeRegister("invalid", 0);
+		target.writeRegister(JopRegister.MEM_RD_DATA, 0);
 	}
 
 	@Test
@@ -153,7 +158,7 @@ public class DummyJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 				states.add(newState);
 			}
 
@@ -171,7 +176,7 @@ public class DummyJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 				states.add(newState);
 			}
 
@@ -190,11 +195,57 @@ public class DummyJopTargetTest {
 	}
 
 	@Test
-	public void testBreakpointsNoOp() throws JopTargetException {
+	public void testSuspendReasons() throws JopTargetException {
+		List<JopSuspendReason> reasons = new ArrayList<>();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				if (reason != null) reasons.add(reason);
+			}
+
+			@Override
+			public void outputProduced(String text) {
+			}
+		});
+
 		target.connect();
-		// Should not throw
-		target.addBreakpoint(5);
-		target.removeBreakpoint(5);
+		reasons.clear();
+
+		target.stepMicro();
+		assertEquals(JopSuspendReason.STEP_COMPLETE, reasons.get(0));
+		reasons.clear();
+
+		target.resume();
+		assertEquals(JopSuspendReason.BREAKPOINT, reasons.get(0));
+		reasons.clear();
+
+		target.suspend();
+		assertEquals(JopSuspendReason.MANUAL, reasons.get(0));
+	}
+
+	@Test
+	public void testSetBreakpointReturnsSlot() throws JopTargetException {
+		target.connect();
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, 0);
+		assertTrue(slot >= 0);
+	}
+
+	@Test
+	public void testGetBreakpoints() throws JopTargetException {
+		target.connect();
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, 5);
+		JopBreakpointInfo[] bps = target.getBreakpoints();
+		assertEquals(1, bps.length);
+		assertEquals(slot, bps[0].slot());
+		assertEquals(5, bps[0].address());
+	}
+
+	@Test
+	public void testClearBreakpoint() throws JopTargetException {
+		target.connect();
+		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, 5);
+		target.clearBreakpoint(slot);
+		assertEquals(0, target.getBreakpoints().length);
 	}
 
 	@Test
@@ -228,5 +279,49 @@ public class DummyJopTargetTest {
 		target.connect();
 		target.terminate();
 		target.suspend();
+	}
+
+	@Test
+	public void testReset() throws JopTargetException {
+		target.connect();
+		target.stepMicro(); // Changes A from 42 to 45
+		target.stepMicro(); // Changes A to 48
+
+		List<JopSuspendReason> reasons = new ArrayList<>();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				if (reason != null) reasons.add(reason);
+			}
+
+			@Override
+			public void outputProduced(String text) {
+			}
+		});
+
+		target.reset();
+		assertEquals(JopTargetState.SUSPENDED, target.getState());
+		JopRegisters regs = target.readRegisters();
+		assertEquals(42, regs.a()); // Reset to initial
+		assertEquals(0, regs.pc());
+		assertTrue(reasons.contains(JopSuspendReason.RESET));
+	}
+
+	@Test
+	public void testGetTargetInfo() {
+		JopTargetInfo info = target.getTargetInfo();
+		assertNotNull(info);
+		assertEquals(1, info.numCores());
+		assertEquals(4, info.numBreakpoints());
+		assertEquals(128, info.stackDepth());
+		assertEquals(1024, info.memorySize());
+		assertEquals("dummy", info.version());
+	}
+
+	@Test
+	public void testResolveLineToAddress() {
+		// Dummy returns identity
+		assertEquals(5, target.resolveLineToAddress(5));
+		assertEquals(10, target.resolveLineToAddress(10));
 	}
 }

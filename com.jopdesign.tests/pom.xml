@@ -26,7 +26,91 @@
                     <useUIThread>false</useUIThread>
                     <product>org.eclipse.platform.ide</product>
                     <application>org.eclipse.ui.ide.workbench</application>
+                    <argLine>${tycho.testArgLine}</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Copy JaCoCo CLI jar for aggregate reporting -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-jacoco-cli</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.jacoco</groupId>
+                                    <artifactId>org.jacoco.cli</artifactId>
+                                    <version>${jacoco.version}</version>
+                                    <classifier>nodeps</classifier>
+                                    <outputDirectory>${project.build.directory}/jacoco-cli</outputDirectory>
+                                    <destFileName>jacoco-cli.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Generate aggregate HTML report covering all source plugins -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-aggregate-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>java</executable>
+                            <arguments>
+                                <argument>-jar</argument>
+                                <argument>${project.build.directory}/jacoco-cli/jacoco-cli.jar</argument>
+                                <argument>report</argument>
+                                <argument>${project.build.directory}/jacoco.exec</argument>
+                                <argument>--classfiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.core/target/classes</argument>
+                                <argument>--classfiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.microcode/target/classes</argument>
+                                <argument>--classfiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.ui/target/classes</argument>
+                                <argument>--sourcefiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.core/src</argument>
+                                <argument>--sourcefiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.microcode/src</argument>
+                                <argument>--sourcefiles</argument>
+                                <argument>${project.basedir}/../com.jopdesign.ui/src</argument>
+                                <argument>--html</argument>
+                                <argument>${project.build.directory}/site/jacoco-aggregate</argument>
+                                <argument>--csv</argument>
+                                <argument>${project.build.directory}/site/jacoco-aggregate.csv</argument>
+                                <argument>--xml</argument>
+                                <argument>${project.build.directory}/site/jacoco-aggregate.xml</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

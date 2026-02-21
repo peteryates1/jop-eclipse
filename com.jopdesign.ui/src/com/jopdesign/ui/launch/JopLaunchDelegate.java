@@ -23,6 +23,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import com.jopdesign.core.sim.DummyJopTarget;
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
+import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
 import com.jopdesign.core.sim.SimulatorJopTarget;
@@ -85,7 +86,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 
 			target.addListener(new IJopTargetListener() {
 				@Override
-				public void stateChanged(JopTargetState newState) {
+				public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
 					if (newState == JopTargetState.TERMINATED) {
 						stream.println("[Terminated]");
 						try {

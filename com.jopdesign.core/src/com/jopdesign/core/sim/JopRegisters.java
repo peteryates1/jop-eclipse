@@ -1,22 +1,21 @@
 package com.jopdesign.core.sim;
 
 /**
- * Snapshot of JOP processor registers.
+ * Snapshot of JOP processor registers, aligned with the debug protocol's
+ * 12-register set.
  *
- * @param a           TOS register (top of stack)
- * @param b           NOS register (next of stack)
- * @param pc          microcode program counter
- * @param sp          stack pointer
- * @param vp          variable pointer (frame pointer)
- * @param ar          address register
- * @param jpc         Java program counter
- * @param mulA        multiply unit operand A
- * @param mulB        multiply unit operand B
- * @param mulResult   multiply unit result (64-bit)
- * @param memReadAddr memory read address register
+ * @param a            TOS register (top of stack)
+ * @param b            NOS register (next of stack)
+ * @param pc           microcode program counter
+ * @param sp           stack pointer
+ * @param vp           variable pointer (frame pointer)
+ * @param ar           address register
+ * @param jpc          Java program counter
+ * @param mulResult    multiply unit result (lower 32 bits)
+ * @param memReadAddr  memory read address register
  * @param memWriteAddr memory write address register
  * @param memWriteData memory write data register
- * @param memReadData memory read data register
+ * @param memReadData  memory read data register
  */
 public record JopRegisters(
 		int a,
@@ -26,9 +25,7 @@ public record JopRegisters(
 		int vp,
 		int ar,
 		int jpc,
-		int mulA,
-		int mulB,
-		long mulResult,
+		int mulResult,
 		int memReadAddr,
 		int memWriteAddr,
 		int memWriteData,

@@ -1,5 +1,8 @@
 package com.jopdesign.microcode.debug;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.eclipse.core.resources.IMarkerDelta;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
@@ -17,6 +20,8 @@ import org.eclipse.debug.core.model.IThread;
 
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
+import com.jopdesign.core.sim.JopBreakpointType;
+import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
 
@@ -33,8 +38,8 @@ public class JopDebugTarget implements IDebugTarget {
 	private final JopThread thread;
 	private final String name;
 
-	/** Tracks whether a step operation is in progress for correct event detail. */
-	private volatile boolean stepping;
+	/** Maps Eclipse breakpoints to target breakpoint slot IDs. */
+	private final Map<IBreakpoint, Integer> breakpointSlots = new HashMap<>();
 
 	public JopDebugTarget(ILaunch launch, IJopTarget target, String name) {
 		this.launch = launch;
@@ -45,8 +50,8 @@ public class JopDebugTarget implements IDebugTarget {
 		// Listen for target state changes
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState) {
-				handleStateChange(newState);
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				handleStateChange(newState, reason);
 			}
 
 			@Override
@@ -69,15 +74,18 @@ public class JopDebugTarget implements IDebugTarget {
 		fireEvent(new DebugEvent(this, DebugEvent.CREATE));
 	}
 
-	private void handleStateChange(JopTargetState newState) {
+	private void handleStateChange(JopTargetState newState, JopSuspendReason reason) {
 		switch (newState) {
 			case SUSPENDED -> {
-				int detail = stepping ? DebugEvent.STEP_END : DebugEvent.BREAKPOINT;
-				stepping = false;
+				int detail;
+				if (reason == JopSuspendReason.STEP_COMPLETE) {
+					detail = DebugEvent.STEP_END;
+				} else {
+					detail = DebugEvent.BREAKPOINT;
+				}
 				fireEvent(new DebugEvent(thread, DebugEvent.SUSPEND, detail));
 			}
 			case TERMINATED -> {
-				stepping = false;
 				fireEvent(new DebugEvent(thread, DebugEvent.TERMINATE));
 				fireEvent(new DebugEvent(this, DebugEvent.TERMINATE));
 				DebugPlugin.getDefault().getBreakpointManager().removeBreakpointListener(this);
@@ -100,23 +108,19 @@ public class JopDebugTarget implements IDebugTarget {
 	}
 
 	public void stepOver() throws DebugException {
-		stepping = true;
 		fireEvent(new DebugEvent(thread, DebugEvent.RESUME, DebugEvent.STEP_OVER));
 		try {
 			target.stepMicro();
 		} catch (JopTargetException e) {
-			stepping = false;
 			throw new DebugException(new Status(IStatus.ERROR, MODEL_ID, e.getMessage(), e));
 		}
 	}
 
 	public void stepInto() throws DebugException {
-		stepping = true;
 		fireEvent(new DebugEvent(thread, DebugEvent.RESUME, DebugEvent.STEP_INTO));
 		try {
 			target.stepBytecode();
 		} catch (JopTargetException e) {
-			stepping = false;
 			throw new DebugException(new Status(IStatus.ERROR, MODEL_ID, e.getMessage(), e));
 		}
 	}
@@ -214,7 +218,12 @@ public class JopDebugTarget implements IDebugTarget {
 		if (breakpoint instanceof MicrocodeLineBreakpoint lineBp) {
 			try {
 				if (lineBp.isEnabled()) {
-					target.addBreakpoint(lineBp.getLineNumber());
+					int lineNumber = lineBp.getLineNumber();
+					int addr = target.resolveLineToAddress(lineNumber);
+					if (addr >= 0) {
+						int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
+						breakpointSlots.put(breakpoint, slot);
+					}
 				}
 			} catch (Exception e) {
 				// Ignore
@@ -224,11 +233,14 @@ public class JopDebugTarget implements IDebugTarget {
 
 	@Override
 	public void breakpointRemoved(IBreakpoint breakpoint, IMarkerDelta delta) {
-		if (breakpoint instanceof MicrocodeLineBreakpoint lineBp) {
-			try {
-				target.removeBreakpoint(lineBp.getLineNumber());
-			} catch (Exception e) {
-				// Ignore
+		if (breakpoint instanceof MicrocodeLineBreakpoint) {
+			Integer slot = breakpointSlots.remove(breakpoint);
+			if (slot != null) {
+				try {
+					target.clearBreakpoint(slot);
+				} catch (Exception e) {
+					// Ignore
+				}
 			}
 		}
 	}
@@ -238,9 +250,13 @@ public class JopDebugTarget implements IDebugTarget {
 		if (breakpoint instanceof MicrocodeLineBreakpoint lineBp) {
 			try {
 				if (lineBp.isEnabled()) {
-					target.addBreakpoint(lineBp.getLineNumber());
+					// Re-add if not already tracked
+					if (!breakpointSlots.containsKey(breakpoint)) {
+						breakpointAdded(breakpoint);
+					}
 				} else {
-					target.removeBreakpoint(lineBp.getLineNumber());
+					// Disable = remove
+					breakpointRemoved(breakpoint, delta);
 				}
 			} catch (Exception e) {
 				// Ignore
