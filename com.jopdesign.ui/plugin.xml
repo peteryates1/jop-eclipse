@@ -370,6 +370,9 @@
                                 <adapt type="org.eclipse.core.resources.IFile">
                                     <test property="org.eclipse.core.resources.extension" value="mic"/>
                                 </adapt>
+                                <adapt type="org.eclipse.core.resources.IFile">
+                                    <test property="org.eclipse.core.resources.extension" value="jop"/>
+                                </adapt>
                             </or>
                         </iterate>
                     </with>
@@ -410,6 +413,20 @@
             class="com.jopdesign.ui.perspectives.JopDebugPerspectiveFactory"
             icon="icons/jop-16.png">
         </perspective>
+    </extension>
+
+    <!-- Auto-switch to JOP Debug perspective when launching JOP debug sessions -->
+    <extension point="org.eclipse.debug.ui.launchPerspectives">
+        <launchPerspective
+            configurationType="com.jopdesign.ui.launch.jopApplication"
+            mode="debug"
+            perspective="com.jopdesign.ui.jopDebugPerspective">
+        </launchPerspective>
+        <launchPerspective
+            configurationType="com.jopdesign.ui.launch.microcodeDebug"
+            mode="debug"
+            perspective="com.jopdesign.ui.jopDebugPerspective">
+        </launchPerspective>
     </extension>
 
 </plugin>

@@ -50,38 +50,38 @@ public class DummyJopTarget implements IJopTarget {
 	@Override
 	public void connect() throws JopTargetException {
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.MANUAL);
+		fireStateChanged(state, JopSuspendReason.MANUAL, -1);
 	}
 
 	@Override
 	public void disconnect() throws JopTargetException {
 		state = JopTargetState.TERMINATED;
-		fireStateChanged(state, null);
+		fireStateChanged(state, null, -1);
 	}
 
 	@Override
 	public void resume() throws JopTargetException {
 		checkNotTerminated();
 		state = JopTargetState.RUNNING;
-		fireStateChanged(state, null);
+		fireStateChanged(state, null, -1);
 		// Immediately hit a "breakpoint"
 		cannedPC++;
 		cannedSourceLine++;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.BREAKPOINT);
+		fireStateChanged(state, JopSuspendReason.BREAKPOINT, 0);
 	}
 
 	@Override
 	public void suspend() throws JopTargetException {
 		checkNotTerminated();
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.MANUAL);
+		fireStateChanged(state, JopSuspendReason.MANUAL, -1);
 	}
 
 	@Override
 	public void terminate() throws JopTargetException {
 		state = JopTargetState.TERMINATED;
-		fireStateChanged(state, null);
+		fireStateChanged(state, null, -1);
 	}
 
 	@Override
@@ -95,7 +95,7 @@ public class DummyJopTarget implements IJopTarget {
 		cannedJPC = 0;
 		cannedSourceLine = 1;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.RESET);
+		fireStateChanged(state, JopSuspendReason.RESET, -1);
 	}
 
 	@Override
@@ -105,7 +105,7 @@ public class DummyJopTarget implements IJopTarget {
 		cannedA += 3;
 		cannedSourceLine++;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE);
+		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE, -1);
 	}
 
 	@Override
@@ -116,7 +116,7 @@ public class DummyJopTarget implements IJopTarget {
 		cannedA += 5;
 		cannedSourceLine += 2;
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE);
+		fireStateChanged(state, JopSuspendReason.STEP_COMPLETE, -1);
 	}
 
 	@Override
@@ -129,7 +129,8 @@ public class DummyJopTarget implements IJopTarget {
 		return new JopRegisters(
 				cannedA, cannedB, cannedPC, cannedSP, cannedVP, cannedAR, cannedJPC,
 				0,
-				0, 0, 0, 0);
+				0, 0, 0, 0,
+				0, 0, 0);
 	}
 
 	@Override
@@ -185,7 +186,7 @@ public class DummyJopTarget implements IJopTarget {
 
 	@Override
 	public JopTargetInfo getTargetInfo() {
-		return new JopTargetInfo(1, 4, 128, 1024, "dummy");
+		return new JopTargetInfo(1, 4, 128, 1024, "dummy", 1, 0, 0);
 	}
 
 	@Override
@@ -224,9 +225,9 @@ public class DummyJopTarget implements IJopTarget {
 		}
 	}
 
-	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason) {
+	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 		for (IJopTargetListener l : listeners) {
-			l.stateChanged(newState, reason);
+			l.stateChanged(newState, reason, breakpointSlot);
 		}
 	}
 }

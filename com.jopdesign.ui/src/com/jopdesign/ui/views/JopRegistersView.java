@@ -1,8 +1,12 @@
 package com.jopdesign.ui.views;
 
+import java.util.List;
+
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.model.IDebugTarget;
 import org.eclipse.debug.ui.DebugUITools;
 import org.eclipse.debug.ui.contexts.DebugContextEvent;
 import org.eclipse.debug.ui.contexts.IDebugContextListener;
@@ -23,6 +27,7 @@ import org.eclipse.ui.part.ViewPart;
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.JopRegisters;
 import com.jopdesign.core.sim.JopTargetException;
+import com.jopdesign.core.sim.JopTargetInfo;
 import com.jopdesign.microcode.debug.JopDebugTarget;
 import com.jopdesign.microcode.debug.JopStackFrame;
 import com.jopdesign.microcode.debug.JopThread;
@@ -39,10 +44,14 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 	private JopRegisters previousRegisters;
 	private Color changedColor;
 
-	private static final String[] REGISTER_NAMES = {
-		"A (TOS)", "B (NOS)", "pc", "sp", "vp", "ar", "jpc",
-		"mulResult",
-		"memReadAddr", "memWriteAddr", "memWriteData", "memReadData"
+	private static final String[] ARCH_REGISTER_NAMES = {
+		"A (TOS)", "B (NOS)", "pc", "sp", "vp", "ar", "jpc"
+	};
+	private static final String[] DEBUG_REGISTER_NAMES = {
+		"mulResult", "memReadAddr", "memWriteAddr", "memWriteData", "memReadData"
+	};
+	private static final String[] EXTENDED_REGISTER_NAMES = {
+		"flags", "instr", "jopd"
 	};
 
 	@Override
@@ -70,7 +79,8 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 		decCol.setLabelProvider(new ColumnLabelProvider() {
 			@Override
 			public String getText(Object element) {
-				return Integer.toString(((RegisterEntry) element).value);
+				RegisterEntry entry = (RegisterEntry) element;
+				return entry.isSeparator ? "" : Integer.toString(entry.value);
 			}
 
 			@Override
@@ -85,7 +95,8 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 		hexCol.setLabelProvider(new ColumnLabelProvider() {
 			@Override
 			public String getText(Object element) {
-				return String.format("0x%08X", ((RegisterEntry) element).value);
+				RegisterEntry entry = (RegisterEntry) element;
+				return entry.isSeparator ? "" : String.format("0x%08X", entry.value);
 			}
 
 			@Override
@@ -117,13 +128,22 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 	public void handleDebugEvents(DebugEvent[] events) {
 		for (DebugEvent event : events) {
 			if (event.getKind() == DebugEvent.SUSPEND || event.getKind() == DebugEvent.CHANGE) {
-				Display.getDefault().asyncExec(() -> {
-					if (!tableViewer.getControl().isDisposed()) {
-						IDebugContextService contextService = DebugUITools.getDebugContextManager()
-								.getContextService(getSite().getWorkbenchWindow());
-						updateFromContext(contextService.getActiveContext());
-					}
-				});
+				// Extract target directly from event source (more reliable than context)
+				JopDebugTarget debugTarget = null;
+				Object source = event.getSource();
+				if (source instanceof JopThread thread) {
+					debugTarget = (JopDebugTarget) thread.getDebugTarget();
+				} else if (source instanceof JopDebugTarget target) {
+					debugTarget = target;
+				}
+				if (debugTarget != null) {
+					final JopDebugTarget dt = debugTarget;
+					Display.getDefault().asyncExec(() -> {
+						if (!tableViewer.getControl().isDisposed()) {
+							updateFromTarget(dt);
+						}
+					});
+				}
 				break;
 			}
 		}
@@ -142,17 +162,28 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 			return;
 		}
 
+		updateFromTarget(debugTarget);
+	}
+
+	private void updateFromTarget(JopDebugTarget debugTarget) {
+		if (tableViewer.getControl().isDisposed()) return;
+
 		IJopTarget target = debugTarget.getTarget();
 		try {
 			JopRegisters regs = target.readRegisters();
-			RegisterEntry[] entries = buildEntries(regs);
+			JopTargetInfo info = target.getTargetInfo();
+			RegisterEntry[] entries = buildEntries(regs, info);
 			previousRegisters = regs;
 
-			Display.getDefault().asyncExec(() -> {
-				if (!tableViewer.getControl().isDisposed()) {
-					tableViewer.setInput(entries);
-				}
-			});
+			if (Display.getCurrent() != null) {
+				tableViewer.setInput(entries);
+			} else {
+				Display.getDefault().asyncExec(() -> {
+					if (!tableViewer.getControl().isDisposed()) {
+						tableViewer.setInput(entries);
+					}
+				});
+			}
 		} catch (JopTargetException e) {
 			// Ignore - target may be terminated
 		}
@@ -170,34 +201,79 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 			if (element instanceof JopStackFrame frame) {
 				return (JopDebugTarget) frame.getDebugTarget();
 			}
+			if (element instanceof ILaunch launch) {
+				for (IDebugTarget dt : launch.getDebugTargets()) {
+					if (dt instanceof JopDebugTarget jdt) {
+						return jdt;
+					}
+				}
+			}
 		}
 		return null;
 	}
 
-	private RegisterEntry[] buildEntries(JopRegisters regs) {
-		int[] values = {
-			regs.a(), regs.b(), regs.pc(), regs.sp(), regs.vp(), regs.ar(), regs.jpc(),
-			regs.mulResult(),
-			regs.memReadAddr(), regs.memWriteAddr(), regs.memWriteData(), regs.memReadData()
+	private RegisterEntry[] buildEntries(JopRegisters regs, JopTargetInfo info) {
+		int[] archValues = {
+			regs.a(), regs.b(), regs.pc(), regs.sp(), regs.vp(), regs.ar(), regs.jpc()
+		};
+		int[] debugValues = {
+			regs.mulResult(), regs.memReadAddr(), regs.memWriteAddr(), regs.memWriteData(), regs.memReadData()
+		};
+		int[] extValues = {
+			regs.flags(), regs.instr(), regs.jopd()
 		};
 
-		int[] prevValues = null;
+		int[] prevArchValues = null;
+		int[] prevDebugValues = null;
+		int[] prevExtValues = null;
 		if (previousRegisters != null) {
-			prevValues = new int[] {
+			prevArchValues = new int[] {
 				previousRegisters.a(), previousRegisters.b(), previousRegisters.pc(),
 				previousRegisters.sp(), previousRegisters.vp(), previousRegisters.ar(),
-				previousRegisters.jpc(), previousRegisters.mulResult(),
-				previousRegisters.memReadAddr(), previousRegisters.memWriteAddr(),
-				previousRegisters.memWriteData(), previousRegisters.memReadData()
+				previousRegisters.jpc()
+			};
+			prevDebugValues = new int[] {
+				previousRegisters.mulResult(), previousRegisters.memReadAddr(),
+				previousRegisters.memWriteAddr(), previousRegisters.memWriteData(),
+				previousRegisters.memReadData()
+			};
+			prevExtValues = new int[] {
+				previousRegisters.flags(), previousRegisters.instr(), previousRegisters.jopd()
 			};
 		}
 
-		RegisterEntry[] entries = new RegisterEntry[REGISTER_NAMES.length];
-		for (int i = 0; i < REGISTER_NAMES.length; i++) {
-			boolean changed = prevValues != null && values[i] != prevValues[i];
-			entries[i] = new RegisterEntry(REGISTER_NAMES[i], values[i], changed);
+		boolean showExtended = info != null && info.extendedRegistersMask() != 0;
+		int totalSize = 1 + archValues.length + 1 + debugValues.length;
+		if (showExtended) {
+			totalSize += 1 + extValues.length;
 		}
-		return entries;
+
+		List<RegisterEntry> entries = new java.util.ArrayList<>(totalSize);
+
+		// Architectural group
+		entries.add(new RegisterEntry("--- Architectural ---", 0, false, true));
+		for (int i = 0; i < ARCH_REGISTER_NAMES.length; i++) {
+			boolean changed = prevArchValues != null && archValues[i] != prevArchValues[i];
+			entries.add(new RegisterEntry(ARCH_REGISTER_NAMES[i], archValues[i], changed, false));
+		}
+
+		// Debug group
+		entries.add(new RegisterEntry("--- Debug ---", 0, false, true));
+		for (int i = 0; i < DEBUG_REGISTER_NAMES.length; i++) {
+			boolean changed = prevDebugValues != null && debugValues[i] != prevDebugValues[i];
+			entries.add(new RegisterEntry(DEBUG_REGISTER_NAMES[i], debugValues[i], changed, false));
+		}
+
+		// Extended group (only if target reports them)
+		if (showExtended) {
+			entries.add(new RegisterEntry("--- Extended ---", 0, false, true));
+			for (int i = 0; i < EXTENDED_REGISTER_NAMES.length; i++) {
+				boolean changed = prevExtValues != null && extValues[i] != prevExtValues[i];
+				entries.add(new RegisterEntry(EXTENDED_REGISTER_NAMES[i], extValues[i], changed, false));
+			}
+		}
+
+		return entries.toArray(new RegisterEntry[0]);
 	}
 
 	@Override
@@ -221,11 +297,13 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 		final String name;
 		final int value;
 		final boolean changed;
+		final boolean isSeparator;
 
-		RegisterEntry(String name, int value, boolean changed) {
+		RegisterEntry(String name, int value, boolean changed, boolean isSeparator) {
 			this.name = name;
 			this.value = value;
 			this.changed = changed;
+			this.isSeparator = isSeparator;
 		}
 	}
 }

@@ -23,6 +23,7 @@ import org.eclipse.ui.console.MessageConsoleStream;
 import com.jopdesign.core.sim.DummyJopTarget;
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
+import com.jopdesign.core.sim.JopSimJopTarget;
 import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
@@ -44,9 +45,13 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 	public static final String ATTR_MEM_SIZE = "com.jopdesign.ui.launch.jop.memSize";
 
 	public static final String TARGET_SIMULATOR = "simulator";
+	public static final String TARGET_JOPSIM = "jopsim";
 	public static final String TARGET_RTLSIM = "rtlsim";
 	public static final String TARGET_FPGA = "fpga";
 	public static final String TARGET_DUMMY = "dummy";
+
+	public static final String ATTR_JOP_FILE = "com.jopdesign.ui.launch.jopFile";
+	public static final String ATTR_LINK_FILE = "com.jopdesign.ui.launch.linkFile";
 
 	@Override
 	public void launch(ILaunchConfiguration configuration, String mode,
@@ -75,6 +80,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			launch.setSourceLocator(locator);
 			JopDebugTarget debugTarget = new JopDebugTarget(launch, target, launchName);
 			launch.addDebugTarget(debugTarget);
+			debugTarget.fireInitialSuspendIfNeeded();
 		} else {
 			// Run mode: add debug target (so launch is trackable/terminable),
 			// then resume and stream output to console
@@ -86,7 +92,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 
 			target.addListener(new IJopTargetListener() {
 				@Override
-				public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+				public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 					if (newState == JopTargetState.TERMINATED) {
 						stream.println("[Terminated]");
 						try {
@@ -116,6 +122,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			throws CoreException {
 		return switch (targetType) {
 			case TARGET_SIMULATOR -> createSimulatorTarget(configuration);
+			case TARGET_JOPSIM -> createJopSimTarget(configuration);
 			case TARGET_DUMMY -> new DummyJopTarget();
 			case TARGET_RTLSIM -> throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
 					"RTL simulation target is not yet implemented"));
@@ -160,6 +167,40 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		}
 
 		return new SimulatorJopTarget(program, 1024, memSize, initialSP);
+	}
+
+	private JopSimJopTarget createJopSimTarget(ILaunchConfiguration configuration)
+			throws CoreException {
+		String jopFilePath = configuration.getAttribute(ATTR_JOP_FILE, "");
+		String linkFilePath = configuration.getAttribute(ATTR_LINK_FILE, "");
+
+		if (jopFilePath.isEmpty()) {
+			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+					"No .jop file specified"));
+		}
+
+		// Resolve workspace path to filesystem path if needed
+		String resolvedJopFile = resolveFilePath(jopFilePath);
+
+		String resolvedLinkFile = null;
+		if (!linkFilePath.isEmpty()) {
+			resolvedLinkFile = resolveFilePath(linkFilePath);
+		}
+
+		return new JopSimJopTarget(resolvedJopFile, resolvedLinkFile);
+	}
+
+	private String resolveFilePath(String path) {
+		try {
+			IFile wsFile = ResourcesPlugin.getWorkspace().getRoot().getFile(
+					new org.eclipse.core.runtime.Path(path));
+			if (wsFile.exists()) {
+				return wsFile.getLocation().toOSString();
+			}
+		} catch (Exception e) {
+			// Not a workspace path, use as-is
+		}
+		return path;
 	}
 
 	private MessageConsole findOrCreateConsole(String name) {

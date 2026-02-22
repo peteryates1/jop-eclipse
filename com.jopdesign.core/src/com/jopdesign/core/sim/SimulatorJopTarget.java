@@ -28,6 +28,9 @@ public class SimulatorJopTarget implements IJopTarget {
 	/** Tracks the reason for the next SUSPENDED event. */
 	private volatile JopSuspendReason pendingSuspendReason = JopSuspendReason.UNKNOWN;
 
+	/** Tracks the breakpoint slot for the next BREAKPOINT event. */
+	private volatile int pendingBreakpointSlot = -1;
+
 	/** Breakpoint slot management: slot → BreakpointEntry. */
 	private final Map<Integer, BreakpointEntry> breakpointSlots = new HashMap<>();
 	private int nextSlot = 0;
@@ -66,11 +69,16 @@ public class SimulatorJopTarget implements IJopTarget {
 				JopTargetState mapped = mapState(newState);
 				state = mapped;
 				JopSuspendReason reason = null;
+				int slot = -1;
 				if (mapped == JopTargetState.SUSPENDED) {
 					reason = pendingSuspendReason;
+					if (reason == JopSuspendReason.BREAKPOINT) {
+						slot = pendingBreakpointSlot;
+						pendingBreakpointSlot = -1;
+					}
 					pendingSuspendReason = JopSuspendReason.UNKNOWN;
 				}
-				fireStateChanged(mapped, reason);
+				fireStateChanged(mapped, reason, slot);
 			}
 
 			@Override
@@ -91,6 +99,7 @@ public class SimulatorJopTarget implements IJopTarget {
 	public void resume() throws JopTargetException {
 		checkConnected();
 		pendingSuspendReason = JopSuspendReason.BREAKPOINT;
+		pendingBreakpointSlot = findHitBreakpointSlot();
 		simulator.resume();
 	}
 
@@ -113,7 +122,7 @@ public class SimulatorJopTarget implements IJopTarget {
 		simulator.load(program);
 		simulator.setSP(initialSP);
 		state = JopTargetState.SUSPENDED;
-		fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.RESET);
+		fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.RESET, -1);
 	}
 
 	@Override
@@ -157,7 +166,8 @@ public class SimulatorJopTarget implements IJopTarget {
 				simulator.getAR(),
 				simulator.getJPC(),
 				0, // mulResult not directly exposed by simulator
-				0, 0, 0, simulator.getMemReadData());
+				0, 0, 0, simulator.getMemReadData(),
+				0, 0, 0); // extended registers not available in simulator
 	}
 
 	@Override
@@ -236,7 +246,7 @@ public class SimulatorJopTarget implements IJopTarget {
 
 	@Override
 	public JopTargetInfo getTargetInfo() {
-		return new JopTargetInfo(1, Integer.MAX_VALUE, stackSize, memSize, "simulator");
+		return new JopTargetInfo(1, Integer.MAX_VALUE, stackSize, memSize, "simulator", 1, 0, 0);
 	}
 
 	@Override
@@ -294,10 +304,25 @@ public class SimulatorJopTarget implements IJopTarget {
 		};
 	}
 
-	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason) {
+	private void fireStateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 		for (IJopTargetListener l : listeners) {
-			l.stateChanged(newState, reason);
+			l.stateChanged(newState, reason, breakpointSlot);
 		}
+	}
+
+	/**
+	 * Find the breakpoint slot that matches the current PC (source line).
+	 * Returns -1 if no breakpoint matches.
+	 */
+	private int findHitBreakpointSlot() {
+		if (simulator == null) return -1;
+		int currentLine = simulator.getCurrentSourceLine();
+		for (var entry : breakpointSlots.entrySet()) {
+			if (entry.getValue().sourceLine() == currentLine) {
+				return entry.getKey();
+			}
+		}
+		return -1;
 	}
 
 	private void fireOutputProduced(String text) {

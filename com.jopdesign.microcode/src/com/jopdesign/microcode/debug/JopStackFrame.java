@@ -3,6 +3,7 @@ package com.jopdesign.microcode.debug;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.DebugException;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.model.IDebugTarget;
@@ -15,6 +16,7 @@ import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.JopRegisters;
 import com.jopdesign.core.sim.JopStackData;
 import com.jopdesign.core.sim.JopTargetException;
+import com.jopdesign.core.sim.JopTargetInfo;
 
 /**
  * Stack frame for the unified JOP debug model. Shows all processor registers
@@ -56,6 +58,14 @@ public class JopStackFrame implements IStackFrame {
 			vars.add(new JopVariable(target, "memWriteAddr", regs.memWriteAddr()));
 			vars.add(new JopVariable(target, "memWriteData", regs.memWriteData()));
 			vars.add(new JopVariable(target, "memReadData", regs.memReadData()));
+
+			// Extended registers (only if target reports them)
+			JopTargetInfo info = jopTarget.getTargetInfo();
+			if (info.extendedRegistersMask() != 0) {
+				vars.add(new JopVariable(target, "flags", regs.flags()));
+				vars.add(new JopVariable(target, "instr", regs.instr()));
+				vars.add(new JopVariable(target, "jopd", regs.jopd()));
+			}
 
 			// Stack contents
 			JopStackData stackData = jopTarget.readStack();
@@ -204,6 +214,12 @@ public class JopStackFrame implements IStackFrame {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
-		return null;
+		if (adapter == IDebugTarget.class) {
+			return (T) getDebugTarget();
+		}
+		if (adapter == ILaunch.class) {
+			return (T) getLaunch();
+		}
+		return Platform.getAdapterManager().getAdapter(this, adapter);
 	}
 }

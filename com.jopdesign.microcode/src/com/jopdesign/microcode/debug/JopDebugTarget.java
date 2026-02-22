@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.eclipse.core.resources.IMarkerDelta;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugException;
@@ -50,8 +51,8 @@ public class JopDebugTarget implements IDebugTarget {
 		// Listen for target state changes
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
-				handleStateChange(newState, reason);
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				handleStateChange(newState, reason, breakpointSlot);
 			}
 
 			@Override
@@ -74,16 +75,28 @@ public class JopDebugTarget implements IDebugTarget {
 		fireEvent(new DebugEvent(this, DebugEvent.CREATE));
 	}
 
-	private void handleStateChange(JopTargetState newState, JopSuspendReason reason) {
+	private void handleStateChange(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 		switch (newState) {
 			case SUSPENDED -> {
 				int detail;
 				if (reason == JopSuspendReason.STEP_COMPLETE) {
 					detail = DebugEvent.STEP_END;
-				} else {
+				} else if (reason == JopSuspendReason.BREAKPOINT) {
 					detail = DebugEvent.BREAKPOINT;
+				} else {
+					detail = DebugEvent.CLIENT_REQUEST;
 				}
-				fireEvent(new DebugEvent(thread, DebugEvent.SUSPEND, detail));
+				DebugEvent event = new DebugEvent(thread, DebugEvent.SUSPEND, detail);
+				if (reason == JopSuspendReason.BREAKPOINT && breakpointSlot >= 0) {
+					// Reverse-lookup the Eclipse breakpoint from the slot
+					for (var entry : breakpointSlots.entrySet()) {
+						if (entry.getValue() == breakpointSlot) {
+							event.setData(new IBreakpoint[] { entry.getKey() });
+							break;
+						}
+					}
+				}
+				fireEvent(event);
 			}
 			case TERMINATED -> {
 				fireEvent(new DebugEvent(thread, DebugEvent.TERMINATE));
@@ -99,6 +112,18 @@ public class JopDebugTarget implements IDebugTarget {
 
 	private void fireEvent(DebugEvent event) {
 		DebugPlugin.getDefault().fireDebugEventSet(new DebugEvent[] { event });
+	}
+
+	/**
+	 * Fires an initial SUSPEND event if the target is already suspended.
+	 * Must be called after {@code launch.addDebugTarget(this)} so Eclipse
+	 * can locate the debug target from the launch.
+	 */
+	public void fireInitialSuspendIfNeeded() {
+		JopTargetState s = target.getState();
+		if (s == JopTargetState.SUSPENDED || s == JopTargetState.NOT_STARTED) {
+			fireEvent(new DebugEvent(thread, DebugEvent.SUSPEND, DebugEvent.CLIENT_REQUEST));
+		}
 	}
 
 	// --- Public API ---
@@ -306,6 +331,12 @@ public class JopDebugTarget implements IDebugTarget {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
-		return null;
+		if (adapter == IDebugTarget.class) {
+			return (T) this;
+		}
+		if (adapter == ILaunch.class) {
+			return (T) getLaunch();
+		}
+		return Platform.getAdapterManager().getAdapter(this, adapter);
 	}
 }

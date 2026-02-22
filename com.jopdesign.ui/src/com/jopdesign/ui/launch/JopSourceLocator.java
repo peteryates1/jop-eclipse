@@ -20,7 +20,8 @@ public class JopSourceLocator implements IPersistableSourceLocator {
 
 	@Override
 	public Object getSourceElement(IStackFrame stackFrame) {
-		if (stackFrame instanceof JopStackFrame && microcodeFilePath != null) {
+		if (stackFrame instanceof JopStackFrame
+				&& microcodeFilePath != null && !microcodeFilePath.isEmpty()) {
 			IFile file = ResourcesPlugin.getWorkspace().getRoot()
 					.getFile(new Path(microcodeFilePath));
 			if (file.exists()) {

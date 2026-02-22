@@ -16,7 +16,10 @@ public enum JopRegister {
 	MEM_RD_ADDR(0x08, "memReadAddr"),
 	MEM_WR_ADDR(0x09, "memWriteAddr"),
 	MEM_RD_DATA(0x0A, "memReadData"),
-	MEM_WR_DATA(0x0B, "memWriteData");
+	MEM_WR_DATA(0x0B, "memWriteData"),
+	FLAGS(0x0C, "flags"),
+	INSTR(0x0D, "instr"),
+	JOPD(0x0E, "jopd");
 
 	private final int protocolId;
 	private final String displayName;
@@ -34,10 +37,15 @@ public enum JopRegister {
 		return displayName;
 	}
 
+	/** Returns true if this is an extended register (FLAGS, INSTR, JOPD). */
+	public boolean isExtended() {
+		return protocolId >= 0x0C && protocolId <= 0x0E;
+	}
+
 	/**
 	 * Look up a register by its protocol ID.
 	 *
-	 * @param id the protocol ID (0x00-0x0B)
+	 * @param id the protocol ID (0x00-0x0E)
 	 * @return the register
 	 * @throws IllegalArgumentException if no register has that ID
 	 */

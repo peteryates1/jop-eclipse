@@ -193,7 +193,7 @@ public class SimulatorJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				states.add(newState);
 			}
 
@@ -211,7 +211,7 @@ public class SimulatorJopTargetTest {
 		List<JopSuspendReason> reasons = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				if (reason != null) {
 					reasons.add(reason);
 				}
@@ -243,7 +243,7 @@ public class SimulatorJopTargetTest {
 		List<String> output = new ArrayList<>();
 		outputTarget.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 			}
 
 			@Override
@@ -286,7 +286,7 @@ public class SimulatorJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		IJopTargetListener listener = new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				states.add(newState);
 			}
 
@@ -330,7 +330,7 @@ public class SimulatorJopTargetTest {
 		List<JopSuspendReason> reasons = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				if (reason != null) reasons.add(reason);
 			}
 
@@ -356,6 +356,27 @@ public class SimulatorJopTargetTest {
 		assertEquals(1024, info.stackDepth());
 		assertEquals(1024, info.memorySize());
 		assertEquals("simulator", info.version());
+		assertEquals(1, info.protocolMajor());
+		assertEquals(0, info.protocolMinor());
+		assertEquals(0, info.extendedRegistersMask());
+	}
+
+	@Test
+	public void testWriteMemoryBlock() throws JopTargetException {
+		int[] values = { 100, 200, 300 };
+		target.writeMemoryBlock(50, values);
+		JopMemoryData mem = target.readMemory(50, 3);
+		assertEquals(100, mem.values()[0]);
+		assertEquals(200, mem.values()[1]);
+		assertEquals(300, mem.values()[2]);
+	}
+
+	@Test
+	public void testExtendedRegistersAreZero() throws JopTargetException {
+		JopRegisters regs = target.readRegisters();
+		assertEquals(0, regs.flags());
+		assertEquals(0, regs.instr());
+		assertEquals(0, regs.jopd());
 	}
 
 	@Test

@@ -56,6 +56,20 @@ public interface IJopTarget {
 	void writeMemory(int address, int value) throws JopTargetException;
 
 	/**
+	 * Write a block of values to consecutive memory addresses.
+	 * The default implementation loops over single writes.
+	 * Hardware targets can override for efficiency. Max 256 words per spec.
+	 *
+	 * @param address start address
+	 * @param values  values to write
+	 */
+	default void writeMemoryBlock(int address, int[] values) throws JopTargetException {
+		for (int i = 0; i < values.length; i++) {
+			writeMemory(address + i, values[i]);
+		}
+	}
+
+	/**
 	 * Set a breakpoint at the given address.
 	 *
 	 * @param type breakpoint type

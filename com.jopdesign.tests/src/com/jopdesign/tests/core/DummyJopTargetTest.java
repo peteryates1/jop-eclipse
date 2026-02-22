@@ -158,7 +158,7 @@ public class DummyJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				states.add(newState);
 			}
 
@@ -176,7 +176,7 @@ public class DummyJopTargetTest {
 		List<JopTargetState> states = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				states.add(newState);
 			}
 
@@ -199,7 +199,7 @@ public class DummyJopTargetTest {
 		List<JopSuspendReason> reasons = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				if (reason != null) reasons.add(reason);
 			}
 
@@ -290,7 +290,7 @@ public class DummyJopTargetTest {
 		List<JopSuspendReason> reasons = new ArrayList<>();
 		target.addListener(new IJopTargetListener() {
 			@Override
-			public void stateChanged(JopTargetState newState, JopSuspendReason reason) {
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
 				if (reason != null) reasons.add(reason);
 			}
 
@@ -316,6 +316,49 @@ public class DummyJopTargetTest {
 		assertEquals(128, info.stackDepth());
 		assertEquals(1024, info.memorySize());
 		assertEquals("dummy", info.version());
+		assertEquals(1, info.protocolMajor());
+		assertEquals(0, info.protocolMinor());
+		assertEquals(0, info.extendedRegistersMask());
+	}
+
+	@Test
+	public void testWriteMemoryBlock() throws JopTargetException {
+		target.connect();
+		// DummyJopTarget's writeMemory is a no-op, but writeMemoryBlock should not throw
+		int[] values = { 1, 2, 3 };
+		target.writeMemoryBlock(0, values);
+	}
+
+	@Test
+	public void testExtendedRegistersAreZero() throws JopTargetException {
+		target.connect();
+		JopRegisters regs = target.readRegisters();
+		assertEquals(0, regs.flags());
+		assertEquals(0, regs.instr());
+		assertEquals(0, regs.jopd());
+	}
+
+	@Test
+	public void testBreakpointSlotInResumeListener() throws JopTargetException {
+		List<Integer> slots = new ArrayList<>();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				if (reason == JopSuspendReason.BREAKPOINT) {
+					slots.add(breakpointSlot);
+				}
+			}
+
+			@Override
+			public void outputProduced(String text) {
+			}
+		});
+
+		target.connect();
+		target.resume();
+		// DummyJopTarget fires BREAKPOINT with slot 0 on resume
+		assertEquals(1, slots.size());
+		assertEquals(0, (int) slots.get(0));
 	}
 
 	@Test

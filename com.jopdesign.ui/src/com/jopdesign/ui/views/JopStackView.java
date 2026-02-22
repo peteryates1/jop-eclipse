@@ -3,6 +3,8 @@ package com.jopdesign.ui.views;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.model.IDebugTarget;
 import org.eclipse.debug.ui.DebugUITools;
 import org.eclipse.debug.ui.contexts.DebugContextEvent;
 import org.eclipse.debug.ui.contexts.IDebugContextListener;
@@ -107,13 +109,21 @@ public class JopStackView extends ViewPart implements IDebugContextListener, IDe
 	public void handleDebugEvents(DebugEvent[] events) {
 		for (DebugEvent event : events) {
 			if (event.getKind() == DebugEvent.SUSPEND || event.getKind() == DebugEvent.CHANGE) {
-				Display.getDefault().asyncExec(() -> {
-					if (!tableViewer.getControl().isDisposed()) {
-						IDebugContextService contextService = DebugUITools.getDebugContextManager()
-								.getContextService(getSite().getWorkbenchWindow());
-						updateFromContext(contextService.getActiveContext());
-					}
-				});
+				JopDebugTarget debugTarget = null;
+				Object source = event.getSource();
+				if (source instanceof JopThread thread) {
+					debugTarget = (JopDebugTarget) thread.getDebugTarget();
+				} else if (source instanceof JopDebugTarget target) {
+					debugTarget = target;
+				}
+				if (debugTarget != null) {
+					final JopDebugTarget dt = debugTarget;
+					Display.getDefault().asyncExec(() -> {
+						if (!tableViewer.getControl().isDisposed()) {
+							updateFromTarget(dt);
+						}
+					});
+				}
 				break;
 			}
 		}
@@ -132,17 +142,27 @@ public class JopStackView extends ViewPart implements IDebugContextListener, IDe
 			return;
 		}
 
+		updateFromTarget(debugTarget);
+	}
+
+	private void updateFromTarget(JopDebugTarget debugTarget) {
+		if (tableViewer.getControl().isDisposed()) return;
+
 		IJopTarget target = debugTarget.getTarget();
 		try {
 			JopStackData stackData = target.readStack();
 			JopRegisters regs = target.readRegisters();
 			StackEntry[] entries = buildEntries(stackData, regs);
 
-			Display.getDefault().asyncExec(() -> {
-				if (!tableViewer.getControl().isDisposed()) {
-					tableViewer.setInput(entries);
-				}
-			});
+			if (Display.getCurrent() != null) {
+				tableViewer.setInput(entries);
+			} else {
+				Display.getDefault().asyncExec(() -> {
+					if (!tableViewer.getControl().isDisposed()) {
+						tableViewer.setInput(entries);
+					}
+				});
+			}
 		} catch (JopTargetException e) {
 			// Ignore
 		}
@@ -159,6 +179,13 @@ public class JopStackView extends ViewPart implements IDebugContextListener, IDe
 			}
 			if (element instanceof JopStackFrame frame) {
 				return (JopDebugTarget) frame.getDebugTarget();
+			}
+			if (element instanceof ILaunch launch) {
+				for (IDebugTarget dt : launch.getDebugTargets()) {
+					if (dt instanceof JopDebugTarget jdt) {
+						return jdt;
+					}
+				}
 			}
 		}
 		return null;

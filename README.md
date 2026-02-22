@@ -79,8 +79,10 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
     12-register model, `JopRegister` enum with wire-format IDs, `JopSuspendReason` for halt cause,
     address-based breakpoints with hardware slot management, `reset()`, `getTargetInfo()`,
     `resolveLineToAddress()` for host-side line/address mapping
-  - `SimulatorJopTarget` and `DummyJopTarget` implementations; RTL sim and FPGA targets stubbed
+  - `SimulatorJopTarget` (microcode), `JopSimJopTarget` (JopSim bytecode), and `DummyJopTarget` implementations; RTL sim and FPGA targets stubbed
+  - `JopSimJopTarget` wraps JopSim bytecode interpreter as `IJopTarget` with breakpoint support and `DebugIOSim` for UART capture
   - `JopDebugTarget` bridges any `IJopTarget` to Eclipse debug framework (no fragile `stepping` flag)
+  - Breakpoint slot tracking with `stateChanged(state, reason, breakpointSlot)` listener callback
   - JOP Debug Perspective with Registers view, Stack view, and standard Debug/Variables/Breakpoints
 - **Multi-Core / CMP Configuration** (Phase 7)
   - Enable Multi-Core checkbox with CPU core count spinner (1-8)
@@ -102,16 +104,16 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
 - **Project Properties** (JOP_HOME, JDK 1.6 Home, serial port, microcode defines, main class, output dir, board config)
 - **Workspace Preferences** (Window > Preferences > JOP: includes FPGA tool paths)
 - **Toggle JOP Nature** via project context menu (Configure > Toggle JOP Nature)
-- **Test Suite** (177 tests: JUnit unit tests + SWTBot UI tests, JaCoCo coverage reports)
+- **Test Suite** (222 tests: JUnit unit tests + SWTBot UI tests, JaCoCo coverage reports)
 
 ### Plugin Structure
 
 | Module | Bundle ID | Purpose |
 |--------|-----------|---------|
-| `com.jopdesign.core` | Core | Nature, Builder, Preferences, Toolchain, Classpath, FPGA synthesis |
-| `com.jopdesign.microcode` | Editor | Microcode assembly editor with full IDE support |
-| `com.jopdesign.ui` | UI | Perspective, property pages, nature toggle, .jop editor, commands |
-| `com.jopdesign.tests` | Tests | JUnit and SWTBot test suite |
+| `com.jopdesign.core` | Core | Nature, Builder, Preferences, Toolchain, Classpath, FPGA synthesis, IJopTarget implementations |
+| `com.jopdesign.microcode` | Editor | Microcode assembly editor, JOP debug model (JopDebugTarget/Thread/StackFrame) |
+| `com.jopdesign.ui` | UI | Perspective, property pages, launch config UI, .jop editor, commands |
+| `com.jopdesign.tests` | Tests | 222 JUnit and SWTBot tests with JaCoCo coverage |
 | `com.jopdesign.feature` | Feature | Eclipse feature for p2 distribution |
 | `com.jopdesign.site` | Site | p2 update site |
 | `com.jopdesign.target` | Target | Target platform definition (Eclipse 2025-12) |
@@ -121,7 +123,7 @@ Eclipse plugin suite for [JOP](https://www.jopdesign.com/) (Java Optimized Proce
 Requires Java 21 and Maven 3.9+.
 
 ```bash
-# Build (runs all 177 tests, generates JaCoCo coverage)
+# Build (runs all 222 tests, generates JaCoCo coverage)
 mvn clean verify
 
 # Build, install to Eclipse, and launch

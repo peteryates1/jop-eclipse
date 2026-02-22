@@ -59,22 +59,39 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
 		ILaunchConfigurationType type = manager.getLaunchConfigurationType(CONFIG_TYPE_ID);
 		String filePath = file.getFullPath().toString();
+		boolean isJopFile = "jop".equals(file.getFileExtension());
 
 		// Look for existing config for this file
+		String matchAttr = isJopFile ? JopLaunchDelegate.ATTR_JOP_FILE : JopLaunchDelegate.ATTR_MICROCODE_FILE;
 		ILaunchConfiguration[] configs = manager.getLaunchConfigurations(type);
 		for (ILaunchConfiguration config : configs) {
-			if (filePath.equals(config.getAttribute(JopLaunchDelegate.ATTR_MICROCODE_FILE, ""))) {
+			if (filePath.equals(config.getAttribute(matchAttr, ""))) {
 				return config;
 			}
 		}
 
-		// Create new config with simulator defaults
+		// Create new config
 		String name = manager.generateLaunchConfigurationName(file.getName());
 		ILaunchConfigurationWorkingCopy wc = type.newInstance(null, name);
-		wc.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, JopLaunchDelegate.TARGET_SIMULATOR);
-		wc.setAttribute(JopLaunchDelegate.ATTR_MICROCODE_FILE, filePath);
-		wc.setAttribute(JopLaunchDelegate.ATTR_INITIAL_SP, 64);
-		wc.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, 1024);
+
+		if (isJopFile) {
+			// JOP bytecode simulator for .jop files
+			wc.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, JopLaunchDelegate.TARGET_JOPSIM);
+			wc.setAttribute(JopLaunchDelegate.ATTR_JOP_FILE, filePath);
+			// Look for companion .link.txt file
+			String linkPath = filePath + ".link.txt";
+			IFile linkFile = file.getProject().getFile(
+					file.getProjectRelativePath().toString() + ".link.txt");
+			if (linkFile.exists()) {
+				wc.setAttribute(JopLaunchDelegate.ATTR_LINK_FILE, linkFile.getFullPath().toString());
+			}
+		} else {
+			// Microcode simulator for .asm/.mic files
+			wc.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, JopLaunchDelegate.TARGET_SIMULATOR);
+			wc.setAttribute(JopLaunchDelegate.ATTR_MICROCODE_FILE, filePath);
+			wc.setAttribute(JopLaunchDelegate.ATTR_INITIAL_SP, 64);
+			wc.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, 1024);
+		}
 		return wc.doSave();
 	}
 }
