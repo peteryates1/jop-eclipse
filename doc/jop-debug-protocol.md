@@ -19,7 +19,7 @@ access to all cores via a core ID field in each request.
 - 8N1 framing
 - Binary protocol (no text encoding overhead)
 - Request/response with asynchronous notifications from target
-- Little-endian byte order (matches JOP memory)
+- Big-endian byte order (natural for JOP — Java is big-endian)
 
 ## Message Format
 
@@ -27,13 +27,13 @@ All messages are binary with the following structure:
 
 ```
 +--------+--------+--------+--------+--------+--- ... ---+--------+
-| SYNC   | TYPE   | LEN_LO | LEN_HI | CORE   | PAYLOAD   | CRC8   |
+| SYNC   | TYPE   | LEN_HI | LEN_LO | CORE   | PAYLOAD   | CRC8   |
 +--------+--------+--------+--------+--------+--- ... ---+--------+
 ```
 
 - **SYNC** (1 byte): `0xA5` — frame synchronization
 - **TYPE** (1 byte): message type (see below)
-- **LEN** (2 bytes): payload length in bytes (little-endian, 0 if no payload)
+- **LEN** (2 bytes): payload length in bytes (big-endian, 0 if no payload)
 - **CORE** (1 byte): core ID (0 for single-core, 0..N-1 for CMP)
 - **PAYLOAD** (variable): type-specific data
 - **CRC8** (1 byte): CRC-8/MAXIM over TYPE+LEN+CORE+PAYLOAD
@@ -57,6 +57,7 @@ Total overhead per message: 6 bytes.
 | 0x12 | READ_MEMORY     | 8      | Read memory block                  |
 | 0x13 | WRITE_REGISTER  | 5      | Write a single register            |
 | 0x14 | WRITE_MEMORY    | 8      | Write a single memory word         |
+| 0x15 | WRITE_MEMORY_BLOCK | variable | Write a block of memory words  |
 | 0x20 | SET_BREAKPOINT  | 5      | Set a hardware breakpoint          |
 | 0x21 | CLEAR_BREAKPOINT| 1      | Clear a breakpoint by slot         |
 | 0x22 | QUERY_BREAKPOINTS| none   | List active breakpoints            |
@@ -65,11 +66,11 @@ Total overhead per message: 6 bytes.
 
 ### Target → Host (Responses)
 
-| Type | Name            | Payload | Description                        |
+| Type | Name            | Payload  | Description                       |
 |------|-----------------|---------|------------------------------------|
-| 0x80 | ACK             | 0       | Success, no data                   |
+| 0x80 | ACK             | variable | Success (see note below)          |
 | 0x81 | NAK             | 1       | Error (error code in payload)      |
-| 0x82 | REGISTERS       | 48      | Register dump (response to 0x10)   |
+| 0x82 | REGISTERS       | 48+     | Register dump (response to 0x10)   |
 | 0x83 | STACK_DATA      | variable| Stack words (response to 0x11)     |
 | 0x84 | MEMORY_DATA     | variable| Memory words (response to 0x12)    |
 | 0x85 | STATUS          | 2       | CPU status (response to 0x06)      |
@@ -77,19 +78,24 @@ Total overhead per message: 6 bytes.
 | 0x87 | TARGET_INFO     | variable| Capabilities (response to 0xF1)    |
 | 0x88 | PONG            | none    | Response to PING                   |
 
+**ACK payload**: Most commands receive a 0-byte ACK (payload length = 0).
+SET_BREAKPOINT is the exception: its ACK carries a 1-byte payload containing
+the assigned breakpoint slot number (0..N-1).
+
 ### Target → Host (Asynchronous Notifications)
 
 | Type | Name            | Payload | Description                        |
 |------|-----------------|---------|------------------------------------|
-| 0xC0 | HALTED          | 3       | CPU halted (breakpoint/step/fault) |
+| 0xC0 | HALTED          | 2       | CPU halted (breakpoint/step/fault) |
 
 ## Payload Definitions
 
 ### HALT (0x01)
 No payload. Target halts the CPU at the next instruction boundary.
-Due to pipeline depth (3 stages for microcode, 4 for bytecode), the actual
-halt PC may be a few instructions past the point where HALT was received.
-The HALTED notification reports the exact PC where execution stopped.
+Due to jfetch propagation through the 3-stage pipeline (fetch → decode →
+execute), the actual halt PC may be up to 3 microcode cycles past the point
+where HALT was received. The HALTED notification reports the exact PC where
+execution stopped.
 
 ### RESUME (0x02)
 No payload. Target resumes execution from current PC. If a breakpoint is
@@ -120,12 +126,15 @@ Only valid when CPU is halted (NAK with error 0x01 if running).
 Payload (4 bytes):
 ```
 +--------+--------+--------+--------+
-| OFFSET | OFFSET | COUNT  | COUNT  |
-| LO     | HI     | LO     | HI     |
+| OFFSET          | COUNT           |
+| (16-bit BE)     | (16-bit BE)     |
 +--------+--------+--------+--------+
 ```
-- OFFSET: stack offset (word index from bottom, little-endian)
-- COUNT: number of 32-bit words to read (little-endian)
+- OFFSET: stack offset (word index from bottom, big-endian)
+- COUNT: number of 32-bit words to read (big-endian)
+
+Eclipse should issue READ_REGISTERS first to obtain SP, then compute
+bottom-relative offsets for READ_STACK.
 
 Target responds with STACK_DATA containing COUNT 32-bit words.
 Only valid when halted.
@@ -135,10 +144,10 @@ Payload (8 bytes):
 ```
 +--------+--------+--------+--------+--------+--------+--------+--------+
 | ADDR                               | COUNT                            |
-| (32-bit LE)                        | (32-bit LE)                      |
+| (32-bit BE)                        | (32-bit BE)                      |
 +--------+--------+--------+--------+--------+--------+--------+--------+
 ```
-- ADDR: memory word address (32-bit, little-endian)
+- ADDR: memory word address (32-bit, big-endian)
 - COUNT: number of 32-bit words to read
 
 Target responds with MEMORY_DATA. Only valid when halted.
@@ -148,7 +157,7 @@ Maximum COUNT per request: 256 words (1KB).
 Payload (5 bytes):
 ```
 +--------+--------+--------+--------+--------+
-| REG_ID | VALUE (32-bit LE)                  |
+| REG_ID | VALUE (32-bit BE)                  |
 +--------+--------+--------+--------+--------+
 ```
 REG_ID values — see register table below. Target responds with ACK.
@@ -158,17 +167,32 @@ Only valid when halted.
 Payload (8 bytes):
 ```
 +--------+--------+--------+--------+--------+--------+--------+--------+
-| ADDR (32-bit LE)                   | VALUE (32-bit LE)                |
+| ADDR (32-bit BE)                   | VALUE (32-bit BE)                |
 +--------+--------+--------+--------+--------+--------+--------+--------+
 ```
 Write a single 32-bit word to memory. Target responds with ACK.
 Only valid when halted.
 
+### WRITE_MEMORY_BLOCK (0x15)
+Payload (8 + COUNT*4 bytes):
+```
++--------+--------+--------+--------+--------+--------+--------+--------+--- ... ---+
+| ADDR (32-bit BE)                   | COUNT (32-bit BE)                | DATA      |
++--------+--------+--------+--------+--------+--------+--------+--------+--- ... ---+
+```
+- ADDR: starting memory word address (32-bit, big-endian)
+- COUNT: number of 32-bit words to write (max 256)
+- DATA: COUNT 32-bit words, each big-endian
+
+Write a contiguous block of words to memory. Target responds with ACK.
+Only valid when halted. Maximum COUNT per request: 256 words (1KB),
+matching READ_MEMORY.
+
 ### SET_BREAKPOINT (0x20)
 Payload (5 bytes):
 ```
 +--------+--------+--------+--------+--------+
-| BP_TYPE| ADDRESS (32-bit LE)                |
+| BP_TYPE| ADDRESS (32-bit BE)                |
 +--------+--------+--------+--------+--------+
 ```
 - BP_TYPE: 0x00 = microcode PC breakpoint, 0x01 = bytecode JPC breakpoint
@@ -199,9 +223,13 @@ capabilities so Eclipse can adapt its UI.
 ## Response Payloads
 
 ### REGISTERS (0x82)
-48 bytes — twelve 32-bit registers in fixed order:
+Base payload: 48 bytes — twelve 32-bit registers in fixed order, each
+big-endian. Extended registers (if reported in TARGET_INFO) are appended
+after the base 48 bytes, preserving backward compatibility.
+
+**Architectural Registers** (0x00-0x07):
 ```
-Offset  Register       REG_ID
+Offset  Register       REG_ID  Description
 0       PC             0x00    microcode program counter
 4       JPC            0x01    Java bytecode program counter
 8       A (TOS)        0x02    top of stack
@@ -210,17 +238,37 @@ Offset  Register       REG_ID
 20      VP             0x05    variable pointer
 24      AR             0x06    address register
 28      MUL_RESULT     0x07    multiply result
+```
+
+**Implementation-Specific Debug Registers** (0x08-0x0B):
+
+These expose memory controller internals and are primarily useful for
+hardware debugging and verification.
+```
+Offset  Register       REG_ID  Description
 32      MEM_RD_ADDR    0x08    memory read address
 36      MEM_WR_ADDR    0x09    memory write address
 40      MEM_RD_DATA    0x0A    memory read data
 44      MEM_WR_DATA    0x0B    memory write data
 ```
 
+**Optional Extended Debug Registers** (0x0C-0x0E):
+
+These are reported as present via the `EXTENDED_REGISTERS` tag in
+TARGET_INFO. When present, the REGISTERS payload grows to 60 bytes
+(48 + 3*4).
+```
+Offset  Register       REG_ID  Description
+48      FLAGS          0x0C    flags (zf, nf, eq from StackStage)
+52      INSTR          0x0D    current microcode instruction word
+56      JOPD           0x0E    decoded bytecode operand
+```
+
 ### STACK_DATA (0x83)
-Variable length: COUNT * 4 bytes of 32-bit words, little-endian.
+Variable length: COUNT * 4 bytes of 32-bit words, big-endian.
 
 ### MEMORY_DATA (0x84)
-Variable length: COUNT * 4 bytes of 32-bit words, little-endian.
+Variable length: COUNT * 4 bytes of 32-bit words, big-endian.
 
 ### STATUS (0x85)
 2 bytes:
@@ -234,14 +282,14 @@ Variable length: COUNT * 4 bytes of 32-bit words, little-endian.
   0x02 = step complete, 0x03 = reset, 0x04 = fault
 
 ### HALTED (0xC0) — Asynchronous Notification
-3 bytes:
+2 bytes:
 ```
-+--------+--------+--------+
-| REASON | DATA_LO| DATA_HI|
-+--------+--------+--------+
++--------+--------+
+| REASON | SLOT   |
++--------+--------+
 ```
 - REASON: same as STATUS reason codes
-- DATA: breakpoint slot number (if REASON=breakpoint), otherwise 0
+- SLOT: breakpoint slot number (if REASON=breakpoint), otherwise 0xFF
 
 Sent unsolicited by the target whenever the CPU transitions from running
 to halted. Eclipse uses this to update the debug view immediately rather
@@ -252,7 +300,7 @@ READ_REGISTERS to get the full processor state.
 Variable: N * 6 bytes, one entry per active breakpoint:
 ```
 +--------+--------+--------+--------+--------+--------+
-| SLOT   | TYPE   | ADDRESS (32-bit LE)                |
+| SLOT   | TYPE   | ADDRESS (32-bit BE)                |
 +--------+--------+--------+--------+--------+--------+
 ```
 
@@ -266,11 +314,15 @@ Variable length, structured as tag-value pairs:
 Tags:
 - 0x01: NUM_CORES (1 byte) — number of CPU cores
 - 0x02: NUM_BREAKPOINTS (1 byte) — hardware breakpoint slots per core
-- 0x03: STACK_DEPTH (2 bytes LE) — on-chip stack depth in words
-- 0x04: MEMORY_SIZE (4 bytes LE) — total memory in words
+- 0x03: STACK_DEPTH (2 bytes BE) — on-chip stack depth in words
+- 0x04: MEMORY_SIZE (4 bytes BE) — total memory in words
 - 0x05: MICRO_PIPELINE_DEPTH (1 byte) — microcode pipeline stages
 - 0x06: BYTECODE_PIPELINE_DEPTH (1 byte) — bytecode pipeline stages
 - 0x07: VERSION (variable) — firmware/RTL version string (UTF-8)
+- 0x08: PROTOCOL_VERSION (2 bytes) — major (1 byte) + minor (1 byte);
+  Eclipse checks compatibility on connect. Current version: 1.0.
+- 0x09: EXTENDED_REGISTERS (1 byte) — bitmask of optional register groups
+  present in REGISTERS payload. Bit 0 = FLAGS/INSTR/JOPD (0x0C-0x0E).
 
 ### NAK Error Codes
 
@@ -292,10 +344,10 @@ Host                          Target
   |--- PING ------------------->|
   |<-- PONG --------------------|
   |--- QUERY_INFO -------------->|
-  |<-- TARGET_INFO --------------|
+  |<-- TARGET_INFO --------------|  (check PROTOCOL_VERSION compat)
   |--- HALT ------------------->|
   |<-- ACK ---------------------|
-  |<-- HALTED (reason=manual) --|  (async notification)
+  |<-- HALTED (manual, 0xFF) ---|  (async notification)
   |--- READ_REGISTERS --------->|
   |<-- REGISTERS ---------------|
   |--- READ_STACK 0,128 ------->|
@@ -305,19 +357,35 @@ Host                          Target
   |--- RESUME ------------------>|
   |<-- ACK ---------------------|
   |         ... running ...      |
-  |<-- HALTED (reason=bp, 0) ---|  (async: hit breakpoint)
+  |<-- HALTED (bp, slot=0) -----|  (async: hit breakpoint)
   |--- READ_REGISTERS --------->|
   |<-- REGISTERS ---------------|
   |--- STEP_MICRO -------------->|
   |<-- ACK ---------------------|
-  |<-- HALTED (reason=step) ----|
+  |<-- HALTED (step, 0xFF) -----|
   |--- READ_REGISTERS --------->|
   |<-- REGISTERS ---------------|
 ```
 
 ### Response Timeout
-Host should use a 500ms timeout for responses. If no response is received,
-the host may retry once, then report a communication error.
+Host should use a **100ms** default timeout for responses. For bulk
+memory transfers (READ_MEMORY, WRITE_MEMORY_BLOCK), use a **500ms**
+timeout to accommodate larger payloads at serial speeds. If no response
+is received, the host may retry once, then report a communication error.
+
+### Flow Control
+At 1Mbaud with 256-word (1KB) payloads, the UART TX FIFO can overflow
+if the sender outpaces the receiver. Implementations should use one of:
+
+- **Hardware flow control (RTS/CTS)**: preferred when available. The
+  UART asserts RTS when its RX FIFO is nearly full; the sender pauses
+  until CTS is reasserted.
+- **Software pacing**: insert a configurable inter-word delay (default
+  10us) between 32-bit words in bulk transfers. This is simpler to
+  implement in FPGA but reduces throughput.
+
+Eclipse's serial transport layer should enable RTS/CTS when the port
+supports it and fall back to software pacing otherwise.
 
 ### Async Notification Handling
 The host must be prepared to receive a HALTED notification at any time
@@ -328,6 +396,10 @@ SYNC byte (0xA5) and TYPE field distinguish notifications from responses.
 
 - Each request includes a CORE field selecting which core to operate on
 - HALT/RESUME/STEP operate on individual cores
+- **CORE=0xFF** is a broadcast address meaning "all cores". This applies
+  to HALT and RESUME only. HALT with CORE=0xFF halts all cores; RESUME
+  with CORE=0xFF resumes all cores. HALTED notifications remain per-core
+  (each core reports independently with its own core ID).
 - HALTED notifications include the core ID in the CORE field of the header
 - READ_MEMORY accesses shared memory (CORE field ignored for memory ops)
 - READ_STACK/READ_REGISTERS are per-core
