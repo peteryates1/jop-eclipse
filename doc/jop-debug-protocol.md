@@ -104,7 +104,7 @@ set at the current PC, the target must single-step past it before resuming.
 ### STEP_MICRO (0x03)
 No payload. Execute exactly one microcode instruction, then halt.
 Target responds with ACK, then sends HALTED notification when the step
-completes. The HALTED payload contains the new PC.
+completes.
 
 ### STEP_BYTECODE (0x04)
 No payload. Execute microcode instructions until JPC changes (i.e. one
