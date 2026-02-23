@@ -3,6 +3,7 @@ package com.jopdesign.ui.launch;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.ui.AbstractLaunchConfigurationTab;
@@ -21,9 +22,12 @@ import org.eclipse.swt.widgets.Spinner;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.dialogs.FilteredResourcesSelectionDialog;
 
+import com.jopdesign.core.JopCorePlugin;
+import com.jopdesign.core.preferences.JopPreferences;
+
 /**
  * Launch configuration tab for "JOP Application" configurations.
- * Provides target type selection, microcode file, simulation parameters,
+ * Provides target type selection, main class, microcode file, simulation parameters,
  * RTL sim configuration, and FPGA serial port settings.
  */
 public class JopLaunchTab extends AbstractLaunchConfigurationTab {
@@ -51,6 +55,7 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 	private static final int IDX_DUMMY = 4;
 
 	private Combo targetCombo;
+	private Text mainClassText;
 	private Text fileText;
 	private Spinner spSpinner;
 	private Spinner memSpinner;
@@ -90,6 +95,17 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 				updateLaunchConfigurationDialog();
 			}
 		});
+
+		// --- Main class (visible for all target types) ---
+
+		Label mainClassLabel = new Label(comp, SWT.NONE);
+		mainClassLabel.setText("Main class:");
+
+		mainClassText = new Text(comp, SWT.BORDER);
+		GridData mainClassData = new GridData(GridData.FILL_HORIZONTAL);
+		mainClassData.horizontalSpan = 2;
+		mainClassText.setLayoutData(mainClassData);
+		mainClassText.addModifyListener(e -> updateLaunchConfigurationDialog());
 
 		// --- Microcode Simulator fields ---
 
@@ -308,12 +324,18 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 	@Override
 	public void setDefaults(ILaunchConfigurationWorkingCopy configuration) {
 		configuration.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, JopLaunchDelegate.TARGET_SIMULATOR);
+		configuration.setAttribute(JopLaunchDelegate.ATTR_MAIN_CLASS, "");
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MICROCODE_FILE, "");
 		configuration.setAttribute(JopLaunchDelegate.ATTR_INITIAL_SP, 64);
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, 1024);
 		configuration.setAttribute(JopLaunchDelegate.ATTR_JOP_FILE, "");
 		configuration.setAttribute(JopLaunchDelegate.ATTR_LINK_FILE, "");
-		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PROJECT_DIR, "");
+
+		// Pre-populate SBT project directory from JOP_HOME workspace preference
+		String jopHome = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID)
+				.get(JopPreferences.JOP_HOME, "");
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PROJECT_DIR, jopHome);
+
 		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PATH, "sbt");
 		configuration.setAttribute(JopLaunchDelegate.ATTR_DEBUG_PORT, 4567);
 		configuration.setAttribute(JopLaunchDelegate.ATTR_SERIAL_PORT, "/dev/ttyUSB0");
@@ -331,6 +353,8 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 					break;
 				}
 			}
+			mainClassText.setText(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_MAIN_CLASS, ""));
 			fileText.setText(configuration.getAttribute(
 					JopLaunchDelegate.ATTR_MICROCODE_FILE, ""));
 			spSpinner.setSelection(configuration.getAttribute(
@@ -363,6 +387,7 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		if (idx >= 0 && idx < TARGET_IDS.length) {
 			configuration.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, TARGET_IDS[idx]);
 		}
+		configuration.setAttribute(JopLaunchDelegate.ATTR_MAIN_CLASS, mainClassText.getText().trim());
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MICROCODE_FILE, fileText.getText().trim());
 		configuration.setAttribute(JopLaunchDelegate.ATTR_INITIAL_SP, spSpinner.getSelection());
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, memSpinner.getSelection());

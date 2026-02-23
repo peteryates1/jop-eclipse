@@ -62,6 +62,8 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 	public static final String ATTR_SERIAL_PORT = "com.jopdesign.ui.launch.serialPort";
 	public static final String ATTR_BAUD_RATE = "com.jopdesign.ui.launch.baudRate";
 
+	public static final String ATTR_MAIN_CLASS = "com.jopdesign.ui.launch.mainClass";
+
 	@Override
 	public void launch(ILaunchConfiguration configuration, String mode,
 			ILaunch launch, IProgressMonitor monitor) throws CoreException {
@@ -77,8 +79,11 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		}
 
 		String filePath = configuration.getAttribute(ATTR_MICROCODE_FILE, "");
+		String mainClass = configuration.getAttribute(ATTR_MAIN_CLASS, "");
 		String launchName = "JOP Application [" + targetType + "]";
-		if (!filePath.isEmpty()) {
+		if (!mainClass.isEmpty()) {
+			launchName = "JOP [" + mainClass + " / " + targetType + "]";
+		} else if (!filePath.isEmpty()) {
 			launchName = "JOP [" + Path.of(filePath).getFileName() + " / " + targetType + "]";
 		}
 
