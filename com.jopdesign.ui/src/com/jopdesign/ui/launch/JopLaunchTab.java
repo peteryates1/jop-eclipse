@@ -15,6 +15,7 @@ import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.DirectoryDialog;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Spinner;
 import org.eclipse.swt.widgets.Text;
@@ -22,7 +23,8 @@ import org.eclipse.ui.dialogs.FilteredResourcesSelectionDialog;
 
 /**
  * Launch configuration tab for "JOP Application" configurations.
- * Provides target type selection, microcode file, and simulation parameters.
+ * Provides target type selection, microcode file, simulation parameters,
+ * RTL sim configuration, and FPGA serial port settings.
  */
 public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 
@@ -55,6 +57,15 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 	private Text jopFileText;
 	private Text linkFileText;
 
+	// RTL Simulation fields
+	private Text sbtProjectDirText;
+	private Text sbtPathText;
+	private Spinner debugPortSpinner;
+
+	// FPGA fields
+	private Text serialPortText;
+	private Spinner baudRateSpinner;
+
 	@Override
 	public void createControl(Composite parent) {
 		Composite comp = new Composite(parent, SWT.NONE);
@@ -80,7 +91,8 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 			}
 		});
 
-		// Microcode file
+		// --- Microcode Simulator fields ---
+
 		Label fileLabel = new Label(comp, SWT.NONE);
 		fileLabel.setText("Microcode file:");
 
@@ -97,7 +109,6 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 			}
 		});
 
-		// Initial stack pointer
 		Label spLabel = new Label(comp, SWT.NONE);
 		spLabel.setText("Initial stack pointer:");
 
@@ -110,7 +121,6 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		spData.horizontalSpan = 2;
 		spSpinner.setLayoutData(spData);
 
-		// Memory size
 		Label memLabel = new Label(comp, SWT.NONE);
 		memLabel.setText("Memory size (words):");
 
@@ -123,7 +133,8 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		memData.horizontalSpan = 2;
 		memSpinner.setLayoutData(memData);
 
-		// .jop binary file (for JOP Bytecode Simulator)
+		// --- JopSim Bytecode Simulator fields ---
+
 		Label jopFileLabel = new Label(comp, SWT.NONE);
 		jopFileLabel.setText("JOP binary file (.jop):");
 
@@ -140,7 +151,6 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 			}
 		});
 
-		// .link.txt symbol file (optional, for JOP Bytecode Simulator)
 		Label linkFileLabel = new Label(comp, SWT.NONE);
 		linkFileLabel.setText("Link file (.link.txt):");
 
@@ -156,12 +166,86 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 				browseLinkFile();
 			}
 		});
+
+		// --- RTL Simulation fields ---
+
+		Label sbtDirLabel = new Label(comp, SWT.NONE);
+		sbtDirLabel.setText("SBT project directory:");
+
+		sbtProjectDirText = new Text(comp, SWT.BORDER);
+		sbtProjectDirText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		sbtProjectDirText.addModifyListener(e -> updateLaunchConfigurationDialog());
+
+		Button sbtDirBrowseBtn = new Button(comp, SWT.PUSH);
+		sbtDirBrowseBtn.setText("Browse...");
+		sbtDirBrowseBtn.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				DirectoryDialog dialog = new DirectoryDialog(getShell());
+				dialog.setMessage("Select SpinalHDL SBT project directory");
+				String dir = dialog.open();
+				if (dir != null) {
+					sbtProjectDirText.setText(dir);
+				}
+			}
+		});
+
+		Label sbtPathLabel = new Label(comp, SWT.NONE);
+		sbtPathLabel.setText("SBT executable:");
+
+		sbtPathText = new Text(comp, SWT.BORDER);
+		sbtPathText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		sbtPathText.addModifyListener(e -> updateLaunchConfigurationDialog());
+		GridData sbtPathData = new GridData(GridData.FILL_HORIZONTAL);
+		sbtPathData.horizontalSpan = 1;
+		sbtPathText.setLayoutData(sbtPathData);
+
+		// placeholder for alignment
+		new Label(comp, SWT.NONE);
+
+		Label debugPortLabel = new Label(comp, SWT.NONE);
+		debugPortLabel.setText("Debug port:");
+
+		debugPortSpinner = new Spinner(comp, SWT.BORDER);
+		debugPortSpinner.setMinimum(1024);
+		debugPortSpinner.setMaximum(65535);
+		debugPortSpinner.setSelection(4567);
+		debugPortSpinner.addModifyListener(e -> updateLaunchConfigurationDialog());
+		GridData portData = new GridData();
+		portData.horizontalSpan = 2;
+		debugPortSpinner.setLayoutData(portData);
+
+		// --- FPGA fields ---
+
+		Label serialPortLabel = new Label(comp, SWT.NONE);
+		serialPortLabel.setText("Serial port:");
+
+		serialPortText = new Text(comp, SWT.BORDER);
+		serialPortText.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+		serialPortText.addModifyListener(e -> updateLaunchConfigurationDialog());
+		GridData serialData = new GridData(GridData.FILL_HORIZONTAL);
+		serialData.horizontalSpan = 2;
+		serialPortText.setLayoutData(serialData);
+
+		Label baudLabel = new Label(comp, SWT.NONE);
+		baudLabel.setText("Baud rate:");
+
+		baudRateSpinner = new Spinner(comp, SWT.BORDER);
+		baudRateSpinner.setMinimum(9600);
+		baudRateSpinner.setMaximum(3_000_000);
+		baudRateSpinner.setSelection(1_000_000);
+		baudRateSpinner.addModifyListener(e -> updateLaunchConfigurationDialog());
+		GridData baudData = new GridData();
+		baudData.horizontalSpan = 2;
+		baudRateSpinner.setLayoutData(baudData);
 	}
 
 	private void updateControlEnablement() {
 		int idx = targetCombo.getSelectionIndex();
 		boolean isSimulator = (idx == IDX_SIMULATOR);
 		boolean isJopSim = (idx == IDX_JOPSIM);
+		boolean isRtlSim = (idx == IDX_RTLSIM);
+		boolean isFpga = (idx == IDX_FPGA);
 
 		// Microcode simulator fields
 		fileText.setEnabled(isSimulator);
@@ -171,6 +255,15 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		// JopSim bytecode simulator fields
 		jopFileText.setEnabled(isJopSim);
 		linkFileText.setEnabled(isJopSim);
+
+		// RTL simulation fields
+		sbtProjectDirText.setEnabled(isRtlSim);
+		sbtPathText.setEnabled(isRtlSim);
+		debugPortSpinner.setEnabled(isRtlSim);
+
+		// FPGA fields
+		serialPortText.setEnabled(isFpga);
+		baudRateSpinner.setEnabled(isFpga);
 	}
 
 	private void browseFile() {
@@ -220,6 +313,11 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, 1024);
 		configuration.setAttribute(JopLaunchDelegate.ATTR_JOP_FILE, "");
 		configuration.setAttribute(JopLaunchDelegate.ATTR_LINK_FILE, "");
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PROJECT_DIR, "");
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PATH, "sbt");
+		configuration.setAttribute(JopLaunchDelegate.ATTR_DEBUG_PORT, 4567);
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SERIAL_PORT, "/dev/ttyUSB0");
+		configuration.setAttribute(JopLaunchDelegate.ATTR_BAUD_RATE, 1_000_000);
 	}
 
 	@Override
@@ -243,6 +341,16 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 					JopLaunchDelegate.ATTR_JOP_FILE, ""));
 			linkFileText.setText(configuration.getAttribute(
 					JopLaunchDelegate.ATTR_LINK_FILE, ""));
+			sbtProjectDirText.setText(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_SBT_PROJECT_DIR, ""));
+			sbtPathText.setText(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_SBT_PATH, "sbt"));
+			debugPortSpinner.setSelection(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_DEBUG_PORT, 4567));
+			serialPortText.setText(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_SERIAL_PORT, "/dev/ttyUSB0"));
+			baudRateSpinner.setSelection(configuration.getAttribute(
+					JopLaunchDelegate.ATTR_BAUD_RATE, 1_000_000));
 			updateControlEnablement();
 		} catch (Exception e) {
 			Platform.getLog(getClass()).warn("Failed to load launch configuration", e);
@@ -260,6 +368,11 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		configuration.setAttribute(JopLaunchDelegate.ATTR_MEM_SIZE, memSpinner.getSelection());
 		configuration.setAttribute(JopLaunchDelegate.ATTR_JOP_FILE, jopFileText.getText().trim());
 		configuration.setAttribute(JopLaunchDelegate.ATTR_LINK_FILE, linkFileText.getText().trim());
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PROJECT_DIR, sbtProjectDirText.getText().trim());
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SBT_PATH, sbtPathText.getText().trim());
+		configuration.setAttribute(JopLaunchDelegate.ATTR_DEBUG_PORT, debugPortSpinner.getSelection());
+		configuration.setAttribute(JopLaunchDelegate.ATTR_SERIAL_PORT, serialPortText.getText().trim());
+		configuration.setAttribute(JopLaunchDelegate.ATTR_BAUD_RATE, baudRateSpinner.getSelection());
 	}
 
 	@Override
@@ -267,10 +380,6 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		setErrorMessage(null);
 
 		int idx = targetCombo.getSelectionIndex();
-		if (idx == IDX_RTLSIM || idx == IDX_FPGA) {
-			setErrorMessage("Selected target type is not yet implemented");
-			return false;
-		}
 
 		// Microcode simulator requires a microcode file
 		if (idx == IDX_SIMULATOR) {
@@ -286,6 +395,24 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 			String file = jopFileText.getText().trim();
 			if (file.isEmpty()) {
 				setErrorMessage("JOP binary file must be specified");
+				return false;
+			}
+		}
+
+		// RTL simulation requires SBT project directory
+		if (idx == IDX_RTLSIM) {
+			String dir = sbtProjectDirText.getText().trim();
+			if (dir.isEmpty()) {
+				setErrorMessage("SBT project directory must be specified");
+				return false;
+			}
+		}
+
+		// FPGA requires serial port
+		if (idx == IDX_FPGA) {
+			String port = serialPortText.getText().trim();
+			if (port.isEmpty()) {
+				setErrorMessage("Serial port must be specified");
 				return false;
 			}
 		}

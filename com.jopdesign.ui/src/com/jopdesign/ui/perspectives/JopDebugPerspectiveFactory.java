@@ -32,10 +32,11 @@ public class JopDebugPerspectiveFactory implements IPerspectiveFactory {
 		bottomLeft.addView("com.jopdesign.ui.views.stackView");
 		bottomLeft.addView(IDebugUIConstants.ID_BREAKPOINT_VIEW);
 
-		// Bottom-right: Console + Variables (tabbed)
+		// Bottom-right: Console + Variables + Memory (tabbed)
 		IFolderLayout bottomRight = layout.createFolder("bottomRight", IPageLayout.RIGHT, 0.5f, "bottomLeft");
 		bottomRight.addView("org.eclipse.ui.console.ConsoleView");
 		bottomRight.addView(IDebugUIConstants.ID_VARIABLE_VIEW);
+		bottomRight.addView("com.jopdesign.ui.views.memoryView");
 
 		// Show view shortcuts
 		layout.addShowViewShortcut(IDebugUIConstants.ID_DEBUG_VIEW);
@@ -44,6 +45,7 @@ public class JopDebugPerspectiveFactory implements IPerspectiveFactory {
 		layout.addShowViewShortcut("org.eclipse.ui.console.ConsoleView");
 		layout.addShowViewShortcut("com.jopdesign.ui.views.registersView");
 		layout.addShowViewShortcut("com.jopdesign.ui.views.stackView");
+		layout.addShowViewShortcut("com.jopdesign.ui.views.memoryView");
 
 		// Perspective shortcuts
 		layout.addPerspectiveShortcut("com.jopdesign.ui.jopPerspective");

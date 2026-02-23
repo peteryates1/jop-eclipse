@@ -297,12 +297,15 @@ than polling. After receiving HALTED, Eclipse typically issues
 READ_REGISTERS to get the full processor state.
 
 ### BREAKPOINT_LIST (0x86)
-Variable: N * 6 bytes, one entry per active breakpoint:
+Variable: N * 6 bytes, one entry per breakpoint slot (all slots reported):
 ```
 +--------+--------+--------+--------+--------+--------+
 | SLOT   | TYPE   | ADDRESS (32-bit BE)                |
 +--------+--------+--------+--------+--------+--------+
 ```
+- SLOT byte: bit 7 (0x80) = enabled/active flag, bits 6:0 = slot number.
+  Active breakpoints have bit 7 set (e.g. 0x80 = slot 0 active).
+  Inactive/empty slots have bit 7 clear (e.g. 0x01 = slot 1 inactive).
 
 ### TARGET_INFO (0x87)
 Variable length, structured as tag-value pairs:

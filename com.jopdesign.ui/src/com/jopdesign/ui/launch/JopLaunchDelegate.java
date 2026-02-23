@@ -21,12 +21,14 @@ import org.eclipse.ui.console.MessageConsole;
 import org.eclipse.ui.console.MessageConsoleStream;
 
 import com.jopdesign.core.sim.DummyJopTarget;
+import com.jopdesign.core.sim.FpgaJopTarget;
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
 import com.jopdesign.core.sim.JopSimJopTarget;
 import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
+import com.jopdesign.core.sim.RtlSimJopTarget;
 import com.jopdesign.core.sim.SimulatorJopTarget;
 import com.jopdesign.core.sim.microcode.MicrocodeParser;
 import com.jopdesign.ui.JopUIPlugin;
@@ -53,6 +55,12 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 
 	public static final String ATTR_JOP_FILE = "com.jopdesign.ui.launch.jopFile";
 	public static final String ATTR_LINK_FILE = "com.jopdesign.ui.launch.linkFile";
+
+	public static final String ATTR_SBT_PROJECT_DIR = "com.jopdesign.ui.launch.sbtProjectDir";
+	public static final String ATTR_SBT_PATH = "com.jopdesign.ui.launch.sbtPath";
+	public static final String ATTR_DEBUG_PORT = "com.jopdesign.ui.launch.debugPort";
+	public static final String ATTR_SERIAL_PORT = "com.jopdesign.ui.launch.serialPort";
+	public static final String ATTR_BAUD_RATE = "com.jopdesign.ui.launch.baudRate";
 
 	@Override
 	public void launch(ILaunchConfiguration configuration, String mode,
@@ -124,11 +132,9 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		return switch (targetType) {
 			case TARGET_SIMULATOR -> createSimulatorTarget(configuration);
 			case TARGET_JOPSIM -> createJopSimTarget(configuration);
+			case TARGET_RTLSIM -> createRtlSimTarget(configuration);
+			case TARGET_FPGA -> createFpgaTarget(configuration);
 			case TARGET_DUMMY -> new DummyJopTarget();
-			case TARGET_RTLSIM -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
-					"RTL simulation target is not yet implemented"));
-			case TARGET_FPGA -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
-					"FPGA target is not yet implemented"));
 			default -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Unknown target type: " + targetType));
 		};
@@ -189,6 +195,33 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		}
 
 		return new JopSimJopTarget(resolvedJopFile, resolvedLinkFile);
+	}
+
+	private RtlSimJopTarget createRtlSimTarget(ILaunchConfiguration configuration)
+			throws CoreException {
+		String sbtProjectDir = configuration.getAttribute(ATTR_SBT_PROJECT_DIR, "");
+		String sbtPath = configuration.getAttribute(ATTR_SBT_PATH, "sbt");
+		int debugPort = configuration.getAttribute(ATTR_DEBUG_PORT, 4567);
+
+		if (sbtProjectDir.isEmpty()) {
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
+					"No SBT project directory specified for RTL simulation"));
+		}
+
+		return new RtlSimJopTarget(sbtProjectDir, sbtPath, debugPort);
+	}
+
+	private FpgaJopTarget createFpgaTarget(ILaunchConfiguration configuration)
+			throws CoreException {
+		String serialPort = configuration.getAttribute(ATTR_SERIAL_PORT, "");
+		int baudRate = configuration.getAttribute(ATTR_BAUD_RATE, 1_000_000);
+
+		if (serialPort.isEmpty()) {
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
+					"No serial port specified for FPGA target"));
+		}
+
+		return new FpgaJopTarget(serialPort, baudRate);
 	}
 
 	private String resolveFilePath(String path) {

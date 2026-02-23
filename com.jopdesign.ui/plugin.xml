@@ -395,6 +395,13 @@
             category="com.jopdesign.ui.views"
             icon="icons/jop-16.png">
         </view>
+        <view
+            id="com.jopdesign.ui.views.memoryView"
+            name="JOP Memory"
+            class="com.jopdesign.ui.views.JopMemoryView"
+            category="com.jopdesign.ui.views"
+            icon="icons/jop-16.png">
+        </view>
     </extension>
 
     <!-- JOP Debug Perspective -->
