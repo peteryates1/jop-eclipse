@@ -69,15 +69,6 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			ILaunch launch, IProgressMonitor monitor) throws CoreException {
 		String targetType = configuration.getAttribute(ATTR_TARGET_TYPE, TARGET_SIMULATOR);
 
-		IJopTarget target = createTarget(configuration, targetType);
-
-		try {
-			target.connect();
-		} catch (JopTargetException e) {
-			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
-					"Failed to connect to target: " + e.getMessage(), e));
-		}
-
 		String filePath = configuration.getAttribute(ATTR_MICROCODE_FILE, "");
 		String mainClass = configuration.getAttribute(ATTR_MAIN_CLASS, "");
 		String launchName = "JOP Application [" + targetType + "]";
@@ -85,6 +76,38 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			launchName = "JOP [" + mainClass + " / " + targetType + "]";
 		} else if (!filePath.isEmpty()) {
 			launchName = "JOP [" + Path.of(filePath).getFileName() + " / " + targetType + "]";
+		}
+
+		IJopTarget target = createTarget(configuration, targetType);
+
+		// Set up console output listener BEFORE connect() so SBT compilation
+		// output from RTL sim is visible immediately
+		MessageConsole console = findOrCreateConsole(launchName);
+		MessageConsoleStream stream = console.newMessageStream();
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				if (newState == JopTargetState.TERMINATED) {
+					stream.println("[Terminated]");
+					try {
+						stream.close();
+					} catch (IOException e) {
+						// Ignore
+					}
+				}
+			}
+
+			@Override
+			public void outputProduced(String text) {
+				stream.print(text);
+			}
+		});
+
+		try {
+			target.connect();
+		} catch (JopTargetException e) {
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
+					"Failed to connect to target: " + e.getMessage(), e));
 		}
 
 		if (ILaunchManager.DEBUG_MODE.equals(mode)) {
@@ -97,31 +120,9 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			debugTarget.fireInitialSuspendIfNeeded();
 		} else {
 			// Run mode: add debug target (so launch is trackable/terminable),
-			// then resume and stream output to console
+			// then resume
 			JopDebugTarget debugTarget = new JopDebugTarget(launch, target, launchName);
 			launch.addDebugTarget(debugTarget);
-
-			MessageConsole console = findOrCreateConsole(launchName);
-			MessageConsoleStream stream = console.newMessageStream();
-
-			target.addListener(new IJopTargetListener() {
-				@Override
-				public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
-					if (newState == JopTargetState.TERMINATED) {
-						stream.println("[Terminated]");
-						try {
-							stream.close();
-						} catch (IOException e) {
-							// Ignore
-						}
-					}
-				}
-
-				@Override
-				public void outputProduced(String text) {
-					stream.print(text);
-				}
-			});
 
 			try {
 				target.resume();

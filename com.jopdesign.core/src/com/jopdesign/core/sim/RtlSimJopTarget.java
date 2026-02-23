@@ -32,7 +32,7 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 	private static final int DEFAULT_PORT = 4567;
 	private static final String DEFAULT_HOST = "localhost";
 	private static final int CONNECT_RETRY_DELAY_MS = 1000;
-	private static final int MAX_CONNECT_RETRIES = 30; // 30 seconds max wait
+	private static final int MAX_CONNECT_RETRIES = 300; // 5 minutes max wait for SBT compilation
 
 	private final String sbtProjectDir;
 	private final String sbtPath;
@@ -159,8 +159,6 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 	}
 
 	private void fireSimOutput(String text) {
-		// We don't have direct access to listeners from ProtocolJopTarget,
-		// but the debug model's console listener picks up output via
-		// IJopTargetListener on the launch delegate side.
+		fireOutput(text);
 	}
 }

@@ -127,16 +127,27 @@ public class JopNature implements IProjectNature {
 
 			IClasspathEntry[] entries = javaProject.getRawClasspath();
 			boolean changed = false;
+			boolean hasJop = false;
 			for (int i = 0; i < entries.length; i++) {
-				if (isJreContainer(entries[i])) {
+				if (isJopContainer(entries[i])) {
+					hasJop = true;
+				} else if (isJreContainer(entries[i])) {
 					entries[i] = JavaCore.newContainerEntry(
 							new Path(JopClasspathContainer.CONTAINER_ID));
 					changed = true;
+					hasJop = true;
 					break;
 				}
 			}
 			if (changed) {
 				javaProject.setRawClasspath(entries, null);
+			} else if (!hasJop) {
+				// No JRE container found to replace — append JOP container
+				IClasspathEntry[] newEntries = new IClasspathEntry[entries.length + 1];
+				System.arraycopy(entries, 0, newEntries, 0, entries.length);
+				newEntries[entries.length] = JavaCore.newContainerEntry(
+						new Path(JopClasspathContainer.CONTAINER_ID));
+				javaProject.setRawClasspath(newEntries, null);
 			}
 		} catch (CoreException e) {
 			LOG.warn("Failed to swap JRE → JOP on classpath: " + e.getMessage());

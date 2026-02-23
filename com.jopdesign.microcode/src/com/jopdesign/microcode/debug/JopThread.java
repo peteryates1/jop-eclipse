@@ -16,9 +16,21 @@ import com.jopdesign.core.sim.JopTargetState;
 public class JopThread implements IThread {
 
 	private final JopDebugTarget target;
+	private JopStackFrame cachedFrame;
 
 	public JopThread(JopDebugTarget target) {
 		this.target = target;
+	}
+
+	/**
+	 * Returns the cached stack frame (creating it if needed).
+	 * Reusing the same object lets Eclipse track the instruction pointer annotation.
+	 */
+	JopStackFrame getCachedFrame() {
+		if (cachedFrame == null) {
+			cachedFrame = new JopStackFrame(this, target);
+		}
+		return cachedFrame;
 	}
 
 	@Override
@@ -34,7 +46,7 @@ public class JopThread implements IThread {
 	@Override
 	public IStackFrame[] getStackFrames() {
 		if (isSuspended()) {
-			return new IStackFrame[] { new JopStackFrame(this, target) };
+			return new IStackFrame[] { getCachedFrame() };
 		}
 		return new IStackFrame[0];
 	}
@@ -47,7 +59,7 @@ public class JopThread implements IThread {
 	@Override
 	public IStackFrame getTopStackFrame() {
 		if (isSuspended()) {
-			return new JopStackFrame(this, target);
+			return getCachedFrame();
 		}
 		return null;
 	}

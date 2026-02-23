@@ -493,4 +493,11 @@ public class ProtocolJopTarget implements IJopTarget {
 			l.stateChanged(newState, reason, breakpointSlot);
 		}
 	}
+
+	/** Forward output text to listeners (for subclasses like RTL sim). */
+	protected void fireOutput(String text) {
+		for (IJopTargetListener l : listeners) {
+			l.outputProduced(text);
+		}
+	}
 }

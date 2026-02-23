@@ -96,7 +96,12 @@ public class JopDebugTarget implements IDebugTarget {
 						}
 					}
 				}
-				fireEvent(event);
+				// Fire SUSPEND on thread + CHANGE on stack frame so Eclipse updates
+				// the source annotation to the new line
+				DebugEvent frameChange = new DebugEvent(
+						thread.getCachedFrame(), DebugEvent.CHANGE, DebugEvent.CONTENT);
+				DebugPlugin.getDefault().fireDebugEventSet(
+						new DebugEvent[] { event, frameChange });
 			}
 			case TERMINATED -> {
 				fireEvent(new DebugEvent(thread, DebugEvent.TERMINATE));
