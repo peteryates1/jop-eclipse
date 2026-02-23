@@ -56,7 +56,7 @@ public class JopRegistersView extends ViewPart implements IDebugContextListener,
 
 	@Override
 	public void createPartControl(Composite parent) {
-		changedColor = new Color(Display.getCurrent(), 255, 0, 0);
+		changedColor = new Color(Display.getDefault(), 255, 0, 0);
 
 		tableViewer = new TableViewer(parent, SWT.FULL_SELECTION | SWT.H_SCROLL | SWT.V_SCROLL);
 		Table table = tableViewer.getTable();

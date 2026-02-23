@@ -1,5 +1,6 @@
 package com.jopdesign.microcode.debug;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.DebugException;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.model.IBreakpoint;
@@ -150,6 +151,12 @@ public class MicrocodeThread implements IThread {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
-		return null;
+		if (adapter == IDebugTarget.class) {
+			return (T) getDebugTarget();
+		}
+		if (adapter == ILaunch.class) {
+			return (T) getLaunch();
+		}
+		return Platform.getAdapterManager().getAdapter(this, adapter);
 	}
 }

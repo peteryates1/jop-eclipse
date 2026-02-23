@@ -64,6 +64,9 @@ public interface IJopTarget {
 	 * @param values  values to write
 	 */
 	default void writeMemoryBlock(int address, int[] values) throws JopTargetException {
+		if (values.length > 256) {
+			throw new JopTargetException("writeMemoryBlock: max 256 words per call, got " + values.length);
+		}
 		for (int i = 0; i < values.length; i++) {
 			writeMemory(address + i, values[i]);
 		}

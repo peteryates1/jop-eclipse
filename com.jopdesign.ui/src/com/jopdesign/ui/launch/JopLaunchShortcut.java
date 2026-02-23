@@ -51,7 +51,7 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 			DebugUITools.launch(config, mode);
 		} catch (CoreException e) {
 			JopUIPlugin.getDefault().getLog().log(
-					new Status(IStatus.ERROR, "com.jopdesign.ui", "Launch failed", e));
+					new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID, "Launch failed", e));
 		}
 	}
 
@@ -79,7 +79,6 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 			wc.setAttribute(JopLaunchDelegate.ATTR_TARGET_TYPE, JopLaunchDelegate.TARGET_JOPSIM);
 			wc.setAttribute(JopLaunchDelegate.ATTR_JOP_FILE, filePath);
 			// Look for companion .link.txt file
-			String linkPath = filePath + ".link.txt";
 			IFile linkFile = file.getProject().getFile(
 					file.getProjectRelativePath().toString() + ".link.txt");
 			if (linkFile.exists()) {

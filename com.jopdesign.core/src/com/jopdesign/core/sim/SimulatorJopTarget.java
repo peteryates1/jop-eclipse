@@ -1,8 +1,8 @@
 package com.jopdesign.core.sim;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.jopdesign.core.sim.microcode.ISimulatorListener;
@@ -32,7 +32,7 @@ public class SimulatorJopTarget implements IJopTarget {
 	private volatile int pendingBreakpointSlot = -1;
 
 	/** Breakpoint slot management: slot → BreakpointEntry. */
-	private final Map<Integer, BreakpointEntry> breakpointSlots = new HashMap<>();
+	private final Map<Integer, BreakpointEntry> breakpointSlots = new ConcurrentHashMap<>();
 	private int nextSlot = 0;
 
 	private record BreakpointEntry(JopBreakpointType type, int address, int sourceLine) {}
@@ -139,11 +139,13 @@ public class SimulatorJopTarget implements IJopTarget {
 		int startJpc = simulator.getJPC();
 		int maxSteps = 10000;
 		int steps = 0;
-		// Step until jpc changes, termination, or step limit
+		// Step until jpc changes, termination, step limit, or interruption
 		do {
 			simulator.stepOver();
 			steps++;
-			if (simulator.getState() == SimulatorState.TERMINATED || steps >= maxSteps) {
+			if (simulator.getState() == SimulatorState.TERMINATED
+					|| steps >= maxSteps
+					|| Thread.currentThread().isInterrupted()) {
 				break;
 			}
 		} while (simulator.getJPC() == startJpc);

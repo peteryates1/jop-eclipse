@@ -15,6 +15,7 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.model.ILaunchConfigurationDelegate;
 
 import com.jopdesign.core.sim.microcode.MicrocodeParser;
+import com.jopdesign.ui.JopUIPlugin;
 import com.jopdesign.core.sim.microcode.MicrocodeParser.MicrocodeParseException;
 import com.jopdesign.core.sim.microcode.MicrocodeProgram;
 import com.jopdesign.core.sim.microcode.MicrocodeSimulator;
@@ -38,7 +39,7 @@ public class MicrocodeLaunchDelegate implements ILaunchConfigurationDelegate {
 		int memSize = configuration.getAttribute(ATTR_MEM_SIZE, 1024);
 
 		if (filePath.isEmpty()) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"No microcode file specified"));
 		}
 
@@ -54,7 +55,7 @@ public class MicrocodeLaunchDelegate implements ILaunchConfigurationDelegate {
 				source = Files.readString(Path.of(filePath));
 			}
 		} catch (IOException e) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Cannot read microcode file: " + filePath, e));
 		}
 
@@ -63,14 +64,14 @@ public class MicrocodeLaunchDelegate implements ILaunchConfigurationDelegate {
 		try {
 			program = new MicrocodeParser().parse(source);
 		} catch (MicrocodeParseException e) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Parse error: " + e.getMessage(), e));
 		}
 
 		// Create simulator
 		MicrocodeSimulator simulator = new MicrocodeSimulator(1024, 256, memSize);
-		simulator.setSP(initialSP);
 		simulator.load(program);
+		simulator.setSP(initialSP);
 
 		// Create debug target and add to launch
 		String name = "JOP Microcode [" + Path.of(filePath).getFileName() + "]";

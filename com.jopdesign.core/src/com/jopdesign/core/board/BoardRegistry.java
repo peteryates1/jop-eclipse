@@ -158,9 +158,38 @@ public final class BoardRegistry {
 		if (colonIdx < 0) return "";
 		int quoteStart = json.indexOf('"', colonIdx + 1);
 		if (quoteStart < 0) return "";
-		int quoteEnd = json.indexOf('"', quoteStart + 1);
-		if (quoteEnd < 0) return "";
-		return json.substring(quoteStart + 1, quoteEnd);
+		// Scan for unescaped closing quote
+		int quoteEnd = quoteStart + 1;
+		while (quoteEnd < json.length()) {
+			char c = json.charAt(quoteEnd);
+			if (c == '\\') {
+				quoteEnd += 2; // Skip escaped character
+				continue;
+			}
+			if (c == '"') break;
+			quoteEnd++;
+		}
+		if (quoteEnd >= json.length()) return "";
+		String raw = json.substring(quoteStart + 1, quoteEnd);
+		// Unescape common JSON escape sequences
+		if (raw.indexOf('\\') < 0) return raw;
+		StringBuilder sb = new StringBuilder(raw.length());
+		for (int i = 0; i < raw.length(); i++) {
+			char c = raw.charAt(i);
+			if (c == '\\' && i + 1 < raw.length()) {
+				char next = raw.charAt(++i);
+				switch (next) {
+					case '"', '\\', '/' -> sb.append(next);
+					case 'n' -> sb.append('\n');
+					case 't' -> sb.append('\t');
+					case 'r' -> sb.append('\r');
+					default -> { sb.append('\\'); sb.append(next); }
+				}
+			} else {
+				sb.append(c);
+			}
+		}
+		return sb.toString();
 	}
 
 	private static int getInt(String json, String key, int defaultValue) {
@@ -175,8 +204,10 @@ public final class BoardRegistry {
 			numStart++;
 		}
 		int numEnd = numStart;
-		while (numEnd < json.length() && (Character.isDigit(json.charAt(numEnd))
-				|| json.charAt(numEnd) == '-')) {
+		if (numEnd < json.length() && json.charAt(numEnd) == '-') {
+			numEnd++;
+		}
+		while (numEnd < json.length() && Character.isDigit(json.charAt(numEnd))) {
 			numEnd++;
 		}
 		if (numEnd == numStart) return defaultValue;

@@ -29,6 +29,7 @@ import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
 import com.jopdesign.core.sim.SimulatorJopTarget;
 import com.jopdesign.core.sim.microcode.MicrocodeParser;
+import com.jopdesign.ui.JopUIPlugin;
 import com.jopdesign.core.sim.microcode.MicrocodeParser.MicrocodeParseException;
 import com.jopdesign.core.sim.microcode.MicrocodeProgram;
 import com.jopdesign.microcode.debug.JopDebugTarget;
@@ -63,7 +64,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		try {
 			target.connect();
 		} catch (JopTargetException e) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Failed to connect to target: " + e.getMessage(), e));
 		}
 
@@ -112,7 +113,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			try {
 				target.resume();
 			} catch (JopTargetException e) {
-				throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+				throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 						"Failed to resume target: " + e.getMessage(), e));
 			}
 		}
@@ -124,11 +125,11 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 			case TARGET_SIMULATOR -> createSimulatorTarget(configuration);
 			case TARGET_JOPSIM -> createJopSimTarget(configuration);
 			case TARGET_DUMMY -> new DummyJopTarget();
-			case TARGET_RTLSIM -> throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			case TARGET_RTLSIM -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"RTL simulation target is not yet implemented"));
-			case TARGET_FPGA -> throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			case TARGET_FPGA -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"FPGA target is not yet implemented"));
-			default -> throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			default -> throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Unknown target type: " + targetType));
 		};
 	}
@@ -140,7 +141,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		int memSize = configuration.getAttribute(ATTR_MEM_SIZE, 1024);
 
 		if (filePath.isEmpty()) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"No microcode file specified"));
 		}
 
@@ -154,7 +155,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 				source = Files.readString(Path.of(filePath));
 			}
 		} catch (IOException e) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Cannot read microcode file: " + filePath, e));
 		}
 
@@ -162,7 +163,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		try {
 			program = new MicrocodeParser().parse(source);
 		} catch (MicrocodeParseException e) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Parse error: " + e.getMessage(), e));
 		}
 
@@ -175,7 +176,7 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 		String linkFilePath = configuration.getAttribute(ATTR_LINK_FILE, "");
 
 		if (jopFilePath.isEmpty()) {
-			throw new CoreException(new Status(IStatus.ERROR, "com.jopdesign.ui",
+			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"No .jop file specified"));
 		}
 

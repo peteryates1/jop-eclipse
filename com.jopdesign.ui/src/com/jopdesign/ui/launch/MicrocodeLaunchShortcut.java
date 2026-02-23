@@ -2,6 +2,9 @@ package com.jopdesign.ui.launch;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
@@ -13,6 +16,8 @@ import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
+
+import com.jopdesign.ui.JopUIPlugin;
 
 /**
  * Launch shortcut for "Debug As > JOP Microcode Debug".
@@ -46,8 +51,8 @@ public class MicrocodeLaunchShortcut implements ILaunchShortcut {
 			ILaunchConfiguration config = findOrCreateConfig(file);
 			DebugUITools.launch(config, mode);
 		} catch (CoreException e) {
-			// Log error
-			e.printStackTrace();
+			Platform.getLog(getClass()).log(
+					new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID, "Launch failed", e));
 		}
 	}
 

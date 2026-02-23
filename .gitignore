@@ -6,3 +6,7 @@ bin/
 *.class
 *.jar
 *.zip
+*.jop
+*.link.txt
+.DS_Store
+.idea/

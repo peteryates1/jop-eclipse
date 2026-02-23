@@ -4,6 +4,8 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -127,8 +129,16 @@ public class SimulatorJopTargetTest {
 		assertTrue("Should resolve line 6 to a valid address", addr >= 0);
 		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
 		assertTrue(slot >= 0);
+		CountDownLatch suspended = new CountDownLatch(1);
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				if (newState == JopTargetState.SUSPENDED) suspended.countDown();
+			}
+			@Override public void outputProduced(String text) {}
+		});
 		target.resume();
-		Thread.sleep(300);
+		assertTrue("Should suspend at breakpoint", suspended.await(5, TimeUnit.SECONDS));
 		assertEquals(JopTargetState.SUSPENDED, target.getState());
 		assertEquals(6, target.getCurrentSourceLine());
 	}
@@ -138,8 +148,16 @@ public class SimulatorJopTargetTest {
 		int addr = target.resolveLineToAddress(6);
 		int slot = target.setBreakpoint(JopBreakpointType.MICRO_PC, addr);
 		target.clearBreakpoint(slot);
+		CountDownLatch terminated = new CountDownLatch(1);
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				if (newState == JopTargetState.TERMINATED) terminated.countDown();
+			}
+			@Override public void outputProduced(String text) {}
+		});
 		target.resume();
-		Thread.sleep(300);
+		assertTrue("Should terminate", terminated.await(5, TimeUnit.SECONDS));
 		assertEquals(JopTargetState.TERMINATED, target.getState());
 	}
 
@@ -161,8 +179,16 @@ public class SimulatorJopTargetTest {
 
 	@Test
 	public void testResumeRunsToEnd() throws JopTargetException, InterruptedException {
+		CountDownLatch terminated = new CountDownLatch(1);
+		target.addListener(new IJopTargetListener() {
+			@Override
+			public void stateChanged(JopTargetState newState, JopSuspendReason reason, int breakpointSlot) {
+				if (newState == JopTargetState.TERMINATED) terminated.countDown();
+			}
+			@Override public void outputProduced(String text) {}
+		});
 		target.resume();
-		Thread.sleep(300);
+		assertTrue("Should terminate", terminated.await(5, TimeUnit.SECONDS));
 		assertEquals(JopTargetState.TERMINATED, target.getState());
 	}
 

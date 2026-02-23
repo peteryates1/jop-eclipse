@@ -100,6 +100,9 @@ echo "=== Installing plugins ==="
 for jar in "${SITE_PLUGINS}"/com.jopdesign.*.jar; do
     filename="$(basename "$jar")"
     bundle_name="${filename%%_*}"
+
+    # Skip test bundle — contains SWTBot tests that auto-run
+    [[ "$bundle_name" == "com.jopdesign.tests" ]] && continue
     version="${filename#*_}"
     version="${version%.jar}"
 

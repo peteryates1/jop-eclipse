@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.jface.resource.ColorRegistry;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.text.TextAttribute;
 import org.eclipse.jface.text.rules.ICharacterScanner;
 import org.eclipse.jface.text.rules.IRule;
@@ -13,7 +15,7 @@ import org.eclipse.jface.text.rules.RuleBasedScanner;
 import org.eclipse.jface.text.rules.Token;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.graphics.RGB;
 
 /**
  * Scanner for JOP microcode code partitions. Provides syntax coloring for:
@@ -36,24 +38,24 @@ public class MicrocodeCodeScanner extends RuleBasedScanner {
 	public static final int[] COLOR_IDENTIFIER   = { 64, 64, 64 };      // Dark gray
 	public static final int[] COLOR_DEFAULT      = { 0, 0, 0 };         // Black
 
-	public MicrocodeCodeScanner() {
-		Display display = Display.getDefault();
+	private static final String COLOR_KEY_PREFIX = "com.jopdesign.microcode.";
 
+	public MicrocodeCodeScanner() {
 		IToken instructionToken = new Token(new TextAttribute(
-				new Color(display, COLOR_INSTRUCTION[0], COLOR_INSTRUCTION[1], COLOR_INSTRUCTION[2]),
+				getColor("instruction", COLOR_INSTRUCTION),
 				null, SWT.BOLD));
 		IToken labelDefToken = new Token(new TextAttribute(
-				new Color(display, COLOR_LABEL_DEF[0], COLOR_LABEL_DEF[1], COLOR_LABEL_DEF[2]),
+				getColor("labelDef", COLOR_LABEL_DEF),
 				null, SWT.BOLD));
 		IToken numberToken = new Token(new TextAttribute(
-				new Color(display, COLOR_NUMBER[0], COLOR_NUMBER[1], COLOR_NUMBER[2])));
+				getColor("number", COLOR_NUMBER)));
 		IToken operatorToken = new Token(new TextAttribute(
-				new Color(display, COLOR_OPERATOR[0], COLOR_OPERATOR[1], COLOR_OPERATOR[2]),
+				getColor("operator", COLOR_OPERATOR),
 				null, SWT.BOLD));
 		IToken identifierToken = new Token(new TextAttribute(
-				new Color(display, COLOR_IDENTIFIER[0], COLOR_IDENTIFIER[1], COLOR_IDENTIFIER[2])));
+				getColor("identifier", COLOR_IDENTIFIER)));
 		IToken defaultToken = new Token(new TextAttribute(
-				new Color(display, COLOR_DEFAULT[0], COLOR_DEFAULT[1], COLOR_DEFAULT[2])));
+				getColor("default", COLOR_DEFAULT)));
 
 		setDefaultReturnToken(defaultToken);
 
@@ -72,6 +74,15 @@ public class MicrocodeCodeScanner extends RuleBasedScanner {
 				instructionToken, operatorToken, labelDefToken, identifierToken));
 
 		setRules(rules.toArray(new IRule[0]));
+	}
+
+	private static Color getColor(String name, int[] rgb) {
+		ColorRegistry registry = JFaceResources.getColorRegistry();
+		String key = COLOR_KEY_PREFIX + name;
+		if (!registry.hasValueFor(key)) {
+			registry.put(key, new RGB(rgb[0], rgb[1], rgb[2]));
+		}
+		return registry.get(key);
 	}
 
 	/**

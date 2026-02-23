@@ -2,6 +2,7 @@ package com.jopdesign.ui.launch;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.ui.AbstractLaunchConfigurationTab;
@@ -109,7 +110,7 @@ public class MicrocodeLaunchTab extends AbstractLaunchConfigurationTab {
 			memSpinner.setSelection(configuration.getAttribute(
 					MicrocodeLaunchDelegate.ATTR_MEM_SIZE, 1024));
 		} catch (Exception e) {
-			// Use defaults
+			Platform.getLog(getClass()).warn("Failed to load launch configuration", e);
 		}
 	}
 

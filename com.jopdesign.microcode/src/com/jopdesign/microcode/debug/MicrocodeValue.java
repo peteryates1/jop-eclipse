@@ -1,5 +1,6 @@
 package com.jopdesign.microcode.debug;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.DebugException;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.model.IDebugTarget;
@@ -62,6 +63,6 @@ public class MicrocodeValue implements IValue {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
-		return null;
+		return Platform.getAdapterManager().getAdapter(this, adapter);
 	}
 }

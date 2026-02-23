@@ -24,6 +24,7 @@ import com.jopdesign.core.sim.JopBreakpointType;
 import com.jopdesign.core.sim.JopRegisters;
 import com.jopdesign.core.sim.JopSimJopTarget;
 import com.jopdesign.core.sim.JopStackData;
+import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetState;
 import com.jopdesign.microcode.debug.JopDebugTarget;
@@ -206,11 +207,16 @@ public class JopSimDebugWorkflowTest {
 		assertEquals(JopTargetState.RUNNING, target.getState());
 
 		Thread.sleep(50);
-		target.suspend();
-		assertEquals(JopTargetState.SUSPENDED, target.getState());
+		try {
+			target.suspend();
+			assertEquals(JopTargetState.SUSPENDED, target.getState());
 
-		JopRegisters regs = target.readRegisters();
-		assertTrue("JPC should have advanced during resume", regs.jpc() > 0);
+			JopRegisters regs = target.readRegisters();
+			assertTrue("JPC should have advanced during resume", regs.jpc() > 0);
+		} catch (JopTargetException e) {
+			// Program may terminate before suspend completes — that's acceptable
+			assertEquals(JopTargetState.TERMINATED, target.getState());
+		}
 	}
 
 	// --- Console output ---
@@ -237,10 +243,17 @@ public class JopSimDebugWorkflowTest {
 		boolean received = gotOutput.await(10, TimeUnit.SECONDS);
 		// The program might terminate or we might need to suspend
 		if (target.getState() == JopTargetState.RUNNING) {
-			target.suspend();
+			try {
+				target.suspend();
+			} catch (JopTargetException e) {
+				// May have terminated during suspend
+			}
 		}
-		// Note: NCoreHelloWorld prints via UART and depends on timer values;
-		// output may or may not appear in simulator time. We just verify no crash.
+		// NCoreHelloWorld prints "Hello World!" via UART. If we received it, verify content.
+		if (received) {
+			assertTrue("Output should contain 'Hello'", output.toString().contains("Hello"));
+		}
+		// Either way, output buffer should have been used (listener was called or not)
 		assertNotNull("Output buffer should not be null", output);
 	}
 

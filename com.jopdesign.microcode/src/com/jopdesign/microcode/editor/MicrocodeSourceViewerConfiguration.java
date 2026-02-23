@@ -1,5 +1,7 @@
 package com.jopdesign.microcode.editor;
 
+import org.eclipse.jface.resource.ColorRegistry;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.text.IDocument;
 import org.eclipse.jface.text.ITextHover;
 import org.eclipse.jface.text.TextAttribute;
@@ -13,7 +15,7 @@ import org.eclipse.jface.text.source.ISourceViewer;
 import org.eclipse.jface.text.source.SourceViewerConfiguration;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
-import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.graphics.RGB;
 
 import com.jopdesign.microcode.syntax.MicrocodeCodeScanner;
 import com.jopdesign.microcode.syntax.MicrocodePartitionScanner;
@@ -51,15 +53,14 @@ public class MicrocodeSourceViewerConfiguration extends SourceViewerConfiguratio
 		reconciler.setRepairer(codeDR, IDocument.DEFAULT_CONTENT_TYPE);
 
 		// Comment partition: green italic
-		Display display = Display.getDefault();
-		Color commentColor = new Color(display, 63, 127, 95);
+		Color commentColor = getRegisteredColor("com.jopdesign.microcode.comment", 63, 127, 95);
 		DefaultDamagerRepairer commentDR = new DefaultDamagerRepairer(
 				new SingleTokenScanner(new Token(new TextAttribute(commentColor, null, SWT.ITALIC))));
 		reconciler.setDamager(commentDR, MicrocodePartitionScanner.MICROCODE_COMMENT);
 		reconciler.setRepairer(commentDR, MicrocodePartitionScanner.MICROCODE_COMMENT);
 
 		// Preprocessor partition: dark gray bold
-		Color preprocColor = new Color(display, 100, 100, 100);
+		Color preprocColor = getRegisteredColor("com.jopdesign.microcode.preprocessor", 100, 100, 100);
 		DefaultDamagerRepairer preprocDR = new DefaultDamagerRepairer(
 				new SingleTokenScanner(new Token(new TextAttribute(preprocColor, null, SWT.BOLD))));
 		reconciler.setDamager(preprocDR, MicrocodePartitionScanner.MICROCODE_PREPROCESSOR);
@@ -87,6 +88,14 @@ public class MicrocodeSourceViewerConfiguration extends SourceViewerConfiguratio
 			return new MicrocodeTextHover();
 		}
 		return null;
+	}
+
+	private static Color getRegisteredColor(String key, int r, int g, int b) {
+		ColorRegistry registry = JFaceResources.getColorRegistry();
+		if (!registry.hasValueFor(key)) {
+			registry.put(key, new RGB(r, g, b));
+		}
+		return registry.get(key);
 	}
 
 	private MicrocodeCodeScanner getCodeScanner() {

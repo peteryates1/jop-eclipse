@@ -24,6 +24,8 @@ import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.handlers.HandlerUtil;
 
+import com.jopdesign.ui.JopUIPlugin;
+
 import com.jopdesign.core.io.DriverStubGenerator;
 import com.jopdesign.core.io.PeripheralDefinition;
 import com.jopdesign.core.io.PeripheralRegistry;
@@ -65,7 +67,7 @@ public class GenerateDriversHandler extends AbstractHandler {
 					Map<String, Integer> enabled = getEnabledPeripherals(proj);
 					if (enabled.isEmpty()) {
 						return new Status(IStatus.INFO,
-								"com.jopdesign.ui",
+								JopUIPlugin.PLUGIN_ID,
 								"No IO peripherals enabled. Configure peripherals in Board Configuration.");
 					}
 

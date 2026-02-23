@@ -81,8 +81,7 @@ public class MicrocodeDebugModelPresentation extends LabelProvider implements ID
 			return new FileEditorInput(file);
 		}
 		if (element instanceof ILineBreakpoint bp) {
-			IFile file = (IFile) bp.getMarker().getResource().getAdapter(IFile.class);
-			if (file != null) {
+			if (bp.getMarker().getResource() instanceof IFile file) {
 				return new FileEditorInput(file);
 			}
 		}

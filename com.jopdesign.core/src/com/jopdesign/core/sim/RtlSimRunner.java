@@ -109,12 +109,13 @@ public class RtlSimRunner {
 
 		LOG.info("RTL simulation: " + String.join(" ", cmd));
 
+		Process process = null;
 		try {
 			ProcessBuilder pb = new ProcessBuilder(cmd);
 			pb.directory(sbtDir);
 			pb.redirectErrorStream(true);
 
-			Process process = pb.start();
+			process = pb.start();
 
 			try (BufferedReader reader = new BufferedReader(
 					new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
@@ -137,6 +138,9 @@ public class RtlSimRunner {
 			throw new CoreException(new Status(IStatus.ERROR, JopCorePlugin.PLUGIN_ID,
 					"Failed to run RTL simulation: " + e.getMessage(), e));
 		} catch (InterruptedException e) {
+			if (process != null) {
+				process.destroyForcibly();
+			}
 			Thread.currentThread().interrupt();
 			throw new CoreException(new Status(IStatus.CANCEL, JopCorePlugin.PLUGIN_ID,
 					"Simulation interrupted"));

@@ -143,13 +143,14 @@ public class JopSimRunner {
 	private SimResult runAndParse(List<String> command, File workingDir,
 			LineConsumer consumer, SubMonitor sub) throws CoreException {
 		List<String> allLines = new ArrayList<>();
+		Process process = null;
 
 		try {
 			ProcessBuilder pb = new ProcessBuilder(command);
 			pb.directory(workingDir);
 			pb.redirectErrorStream(true);
 
-			Process process = pb.start();
+			process = pb.start();
 
 			try (BufferedReader reader = new BufferedReader(
 					new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
@@ -175,6 +176,9 @@ public class JopSimRunner {
 			throw new CoreException(new Status(IStatus.ERROR, JopCorePlugin.PLUGIN_ID,
 					"Failed to run JopSim: " + e.getMessage(), e));
 		} catch (InterruptedException e) {
+			if (process != null) {
+				process.destroyForcibly();
+			}
 			Thread.currentThread().interrupt();
 			throw new CoreException(new Status(IStatus.CANCEL, JopCorePlugin.PLUGIN_ID,
 					"Simulation interrupted"));

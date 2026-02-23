@@ -51,7 +51,11 @@ public class JopBuilder extends IncrementalProjectBuilder {
 	public static final String BUILDER_ID = "com.jopdesign.core.jopBuilder";
 	public static final String MARKER_TYPE = "com.jopdesign.core.microcodeProblem";
 
-	/** Lines to strip from GCC preprocessor output (GCC preamble artifacts) */
+	/**
+	 * Lines to strip from GCC preprocessor output.
+	 * GCC -E emits ~35 lines of preamble (line markers, builtins) before actual content.
+	 * Must match the strip command in the JOP Makefile: {@code gcc -E ... | strip 35 lines}.
+	 */
 	private static final int GCC_HEADER_LINES = 35;
 
 	private static final ILog LOG = Platform.getLog(JopBuilder.class);
@@ -679,35 +683,37 @@ public class JopBuilder extends IncrementalProjectBuilder {
 			pb.directory(workingDir);
 
 			Process process = pb.start();
+			try {
+				// Read stdout and stderr in parallel to avoid deadlock
+				CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> {
+					try {
+						return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+					} catch (IOException e) {
+						return "";
+					}
+				});
+				CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> {
+					try {
+						return new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+					} catch (IOException e) {
+						return "";
+					}
+				});
 
-			// Read stdout and stderr in parallel to avoid deadlock
-			CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> {
-				try {
-					return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-				} catch (IOException e) {
-					return "";
-				}
-			});
-			CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> {
-				try {
-					return new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-				} catch (IOException e) {
-					return "";
-				}
-			});
+				int exitCode = process.waitFor();
+				String stdout = stdoutFuture.join();
+				String stderr = stderrFuture.join();
 
-			int exitCode = process.waitFor();
-			String stdout = stdoutFuture.join();
-			String stderr = stderrFuture.join();
-
-			return new ProcessResult(exitCode, stdout, stderr);
+				return new ProcessResult(exitCode, stdout, stderr);
+			} catch (InterruptedException e) {
+				process.destroyForcibly();
+				Thread.currentThread().interrupt();
+				throw new CoreException(new Status(IStatus.CANCEL, JopCorePlugin.PLUGIN_ID,
+						"Build interrupted"));
+			}
 		} catch (IOException e) {
 			throw new CoreException(new Status(IStatus.ERROR, JopCorePlugin.PLUGIN_ID,
 					"Failed to run: " + String.join(" ", command) + " — " + e.getMessage(), e));
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new CoreException(new Status(IStatus.CANCEL, JopCorePlugin.PLUGIN_ID,
-					"Build interrupted"));
 		}
 	}
 

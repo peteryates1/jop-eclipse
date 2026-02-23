@@ -13,6 +13,10 @@ import com.jopdesign.tools.JopSim;
  * <p>JopSim is a bytecode-level JOP simulator (no microcode pipeline).
  * This target provides debug control (step, breakpoint, suspend/resume)
  * over the JopSim execution loop.
+ *
+ * <p><b>Limitation:</b> JopSim uses a static {@code setExit()} flag, so only
+ * one JopSimJopTarget session can be active at a time. Running multiple
+ * concurrent sessions will cause them to interfere with each other's exit state.
  */
 public class JopSimJopTarget implements IJopTarget {
 
@@ -26,9 +30,11 @@ public class JopSimJopTarget implements IJopTarget {
 	private JopTargetState state = JopTargetState.NOT_STARTED;
 	private volatile boolean halted = true;
 	private volatile boolean terminated = false;
+	private volatile boolean workerParked = true;
 	private volatile JopSuspendReason pendingReason;
 	private final ReentrantLock lock = new ReentrantLock();
 	private final Condition haltCondition = lock.newCondition();
+	private final Condition parkedCondition = lock.newCondition();
 	private Thread workerThread;
 	private final JopBreakpointInfo[] bpSlots = new JopBreakpointInfo[MAX_BREAKPOINTS];
 	private final List<IJopTargetListener> listeners = new CopyOnWriteArrayList<>();
@@ -115,22 +121,11 @@ public class JopSimJopTarget implements IJopTarget {
 		halted = true;
 		pendingReason = JopSuspendReason.MANUAL;
 		// Wait for worker thread to park
-		lock.lock();
-		try {
-			// Worker will park on the condition, so give it a moment
-			// We signal in case it's waiting
-			haltCondition.signalAll();
-		} finally {
-			lock.unlock();
+		waitForWorkerParked();
+		// If the program terminated before we could suspend, don't override the state
+		if (state == JopTargetState.TERMINATED) {
+			throw new JopTargetException("Program terminated before suspend could complete");
 		}
-		// Brief wait for the worker to notice the halt flag
-		try {
-			Thread.sleep(10);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-		state = JopTargetState.SUSPENDED;
-		fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.MANUAL, -1);
 	}
 
 	@Override
@@ -141,19 +136,9 @@ public class JopSimJopTarget implements IJopTarget {
 	@Override
 	public void reset() throws JopTargetException {
 		checkConnected();
-		// Stop worker
+		// Stop worker and wait for it to park
 		halted = true;
-		lock.lock();
-		try {
-			haltCondition.signalAll();
-		} finally {
-			lock.unlock();
-		}
-		try {
-			Thread.sleep(10);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
+		waitForWorkerParked();
 
 		// Recreate JopSim
 		JopSim.setExit(false);
@@ -370,6 +355,8 @@ public class JopSimJopTarget implements IJopTarget {
 				// Wait while halted
 				lock.lock();
 				try {
+					workerParked = true;
+					parkedCondition.signalAll();
 					while (halted && !terminated) {
 						try {
 							haltCondition.await();
@@ -378,6 +365,7 @@ public class JopSimJopTarget implements IJopTarget {
 							return;
 						}
 					}
+					workerParked = false;
 				} finally {
 					lock.unlock();
 				}
@@ -390,7 +378,15 @@ public class JopSimJopTarget implements IJopTarget {
 				JopSim.setExit(false); // Ensure static flag is clear for this run
 				while (!halted && !terminated) {
 					if (!jopSim.interpretOne()) {
-						// Program exited
+						// Program exited — signal parked before returning
+						lock.lock();
+						try {
+							workerParked = true;
+							parkedCondition.signalAll();
+						} finally {
+							lock.unlock();
+						}
+						terminated = true;
 						state = JopTargetState.TERMINATED;
 						fireStateChanged(JopTargetState.TERMINATED, null, -1);
 						return;
@@ -417,6 +413,26 @@ public class JopSimJopTarget implements IJopTarget {
 		}, "JopSim-Worker");
 		workerThread.setDaemon(true);
 		workerThread.start();
+	}
+
+	private void waitForWorkerParked() {
+		lock.lock();
+		try {
+			haltCondition.signalAll();
+			long deadline = System.nanoTime() + 2_000_000_000L; // 2s timeout
+			while (!workerParked && !terminated) {
+				long remaining = deadline - System.nanoTime();
+				if (remaining <= 0) break;
+				try {
+					parkedCondition.awaitNanos(remaining);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					break;
+				}
+			}
+		} finally {
+			lock.unlock();
+		}
 	}
 
 	private void checkConnected() throws JopTargetException {

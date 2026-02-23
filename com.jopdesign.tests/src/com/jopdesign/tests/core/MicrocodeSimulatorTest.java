@@ -4,6 +4,8 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -243,10 +245,22 @@ public class MicrocodeSimulatorTest {
 		sim.addBreakpoint(3);
 
 		// Resume should run and stop at the breakpoint
+		CountDownLatch suspended = new CountDownLatch(1);
+		sim.addListener(new ISimulatorListener() {
+			@Override
+			public void stateChanged(SimulatorState newState) {
+				if (newState == SimulatorState.SUSPENDED) suspended.countDown();
+			}
+			@Override public void outputProduced(String text) {}
+		});
 		sim.resume();
 
-		// Wait for the simulator thread to complete
-		try { Thread.sleep(200); } catch (InterruptedException e) { /* ignore */ }
+		try {
+			assertTrue("Should suspend at breakpoint", suspended.await(5, TimeUnit.SECONDS));
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			fail("Interrupted");
+		}
 
 		assertEquals(SimulatorState.SUSPENDED, sim.getState());
 		assertEquals(3, sim.getCurrentSourceLine());

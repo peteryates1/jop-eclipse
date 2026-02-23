@@ -28,7 +28,7 @@ public final class JopProjectPreferences {
 	public static String get(IProject project, String key, String defaultValue) {
 		IEclipsePreferences projectPrefs = forProject(project);
 		String value = projectPrefs.get(key, null);
-		if (value != null && !value.isEmpty()) {
+		if (value != null) {
 			return value;
 		}
 		IEclipsePreferences workspacePrefs = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID);

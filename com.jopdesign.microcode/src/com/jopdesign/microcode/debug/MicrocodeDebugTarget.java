@@ -2,6 +2,7 @@ package com.jopdesign.microcode.debug;
 
 import org.eclipse.core.resources.IMarkerDelta;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.debug.core.DebugEvent;
 import org.eclipse.debug.core.DebugException;
@@ -254,6 +255,12 @@ public class MicrocodeDebugTarget implements IDebugTarget {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T> T getAdapter(Class<T> adapter) {
-		return null;
+		if (adapter == IDebugTarget.class) {
+			return (T) this;
+		}
+		if (adapter == ILaunch.class) {
+			return (T) getLaunch();
+		}
+		return Platform.getAdapterManager().getAdapter(this, adapter);
 	}
 }
