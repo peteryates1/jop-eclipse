@@ -14,6 +14,9 @@ import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.ui.DebugUITools;
 import org.eclipse.debug.ui.ILaunchShortcut;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jface.viewers.ISelection;
@@ -28,7 +31,8 @@ import com.jopdesign.ui.JopUIPlugin;
 
 /**
  * Launch shortcut for "Run/Debug As > JOP Application".
- * Handles .jop files (JopSim) and Java compilation units (RTL sim default).
+ * Handles .jop files (JopSim) and Java elements (types, methods, compilation
+ * units, packages, projects) — same contexts as Java Application.
  */
 public class JopLaunchShortcut implements ILaunchShortcut {
 
@@ -38,16 +42,16 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 	public void launch(ISelection selection, String mode) {
 		if (selection instanceof IStructuredSelection structSel) {
 			Object element = structSel.getFirstElement();
-			if (element instanceof ICompilationUnit cu) {
-				launchCompilationUnit(cu, mode);
-			} else if (element instanceof IFile file) {
-				if ("java".equals(file.getFileExtension())) {
-					ICompilationUnit cu = JavaCore.createCompilationUnitFrom(file);
-					if (cu != null) {
-						launchCompilationUnit(cu, mode);
-						return;
-					}
-				}
+
+			// Try to resolve as a Java element first
+			IJavaElement javaElement = resolveJavaElement(element);
+			if (javaElement != null) {
+				launchJavaElement(javaElement, mode);
+				return;
+			}
+
+			// Fall back to IFile handling (.jop, .asm, etc.)
+			if (element instanceof IFile file) {
 				launch(file, mode);
 			}
 		}
@@ -56,12 +60,21 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 	@Override
 	public void launch(IEditorPart editor, String mode) {
 		IEditorInput input = editor.getEditorInput();
+
+		// Try Java element from editor input
+		IJavaElement javaElement = input.getAdapter(IJavaElement.class);
+		if (javaElement != null) {
+			launchJavaElement(javaElement, mode);
+			return;
+		}
+
+		// Fall back to IFile
 		IFile file = input.getAdapter(IFile.class);
 		if (file != null) {
 			if ("java".equals(file.getFileExtension())) {
 				ICompilationUnit cu = JavaCore.createCompilationUnitFrom(file);
 				if (cu != null) {
-					launchCompilationUnit(cu, mode);
+					launchJavaElement(cu, mode);
 					return;
 				}
 			}
@@ -69,10 +82,21 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		}
 	}
 
-	private void launchCompilationUnit(ICompilationUnit cu, String mode) {
+	private IJavaElement resolveJavaElement(Object element) {
+		if (element instanceof IJavaElement je) {
+			return je;
+		}
+		if (element instanceof IFile file && "java".equals(file.getFileExtension())) {
+			return JavaCore.createCompilationUnitFrom(file);
+		}
+		return null;
+	}
+
+	private void launchJavaElement(IJavaElement element, String mode) {
 		try {
-			String mainClass = extractMainClass(cu);
-			IProject project = cu.getJavaProject().getProject();
+			String mainClass = extractMainClass(element);
+			IJavaProject javaProject = element.getJavaProject();
+			IProject project = javaProject != null ? javaProject.getProject() : null;
 			ILaunchConfiguration config = findOrCreateJavaConfig(mainClass, project);
 			DebugUITools.launch(config, mode);
 		} catch (CoreException e) {
@@ -81,18 +105,32 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		}
 	}
 
-	private String extractMainClass(ICompilationUnit cu) throws CoreException {
-		IType[] types = cu.getTypes();
-		if (types.length > 0) {
-			return types[0].getFullyQualifiedName();
+	private String extractMainClass(IJavaElement element) throws CoreException {
+		// Walk up to the declaring type
+		if (element instanceof IMethod method) {
+			IType type = method.getDeclaringType();
+			if (type != null) {
+				return type.getFullyQualifiedName();
+			}
 		}
-		// Fallback: derive from file name
-		String name = cu.getElementName();
-		if (name.endsWith(".java")) {
-			name = name.substring(0, name.length() - 5);
+		if (element instanceof IType type) {
+			return type.getFullyQualifiedName();
 		}
-		String pkg = cu.getParent() != null ? cu.getParent().getElementName() : "";
-		return pkg.isEmpty() ? name : pkg + "." + name;
+		if (element instanceof ICompilationUnit cu) {
+			IType[] types = cu.getTypes();
+			if (types.length > 0) {
+				return types[0].getFullyQualifiedName();
+			}
+			// Fallback: derive from file name
+			String name = cu.getElementName();
+			if (name.endsWith(".java")) {
+				name = name.substring(0, name.length() - 5);
+			}
+			String pkg = cu.getParent() != null ? cu.getParent().getElementName() : "";
+			return pkg.isEmpty() ? name : pkg + "." + name;
+		}
+		// For packages, projects, etc. — use element name as placeholder
+		return element.getElementName();
 	}
 
 	private ILaunchConfiguration findOrCreateJavaConfig(String mainClass, IProject project)
@@ -116,7 +154,10 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		wc.setAttribute(JopLaunchDelegate.ATTR_MAIN_CLASS, mainClass);
 
 		// Pre-populate SBT project dir from JOP_HOME preference
-		String jopHome = JopProjectPreferences.get(project, JopPreferences.JOP_HOME, "");
+		String jopHome = "";
+		if (project != null) {
+			jopHome = JopProjectPreferences.get(project, JopPreferences.JOP_HOME, "");
+		}
 		if (jopHome.isEmpty()) {
 			jopHome = InstanceScope.INSTANCE.getNode(JopCorePlugin.PLUGIN_ID)
 					.get(JopPreferences.JOP_HOME, "");

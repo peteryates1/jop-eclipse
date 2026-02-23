@@ -351,7 +351,7 @@
         </debugModelPresentation>
     </extension>
 
-    <!-- Run/Debug As > JOP Application shortcut (.jop files and Java classes) -->
+    <!-- Run/Debug As > JOP Application shortcut (.jop files + same contexts as Java Application) -->
     <extension point="org.eclipse.debug.ui.launchShortcuts">
         <shortcut
             id="com.jopdesign.ui.launch.jopShortcut"
@@ -367,7 +367,17 @@
                                 <adapt type="org.eclipse.core.resources.IFile">
                                     <test property="org.eclipse.core.resources.extension" value="jop"/>
                                 </adapt>
-                                <adapt type="org.eclipse.jdt.core.ICompilationUnit"/>
+                                <and>
+                                    <adapt type="org.eclipse.jdt.core.IJavaElement">
+                                        <test property="org.eclipse.jdt.core.isInJavaProject"/>
+                                    </adapt>
+                                    <or>
+                                        <test property="org.eclipse.jdt.launching.hasMain"/>
+                                        <test property="org.eclipse.jdt.launching.isContainer"/>
+                                        <test property="org.eclipse.jdt.launching.isPackageFragment"/>
+                                        <test property="org.eclipse.jdt.launching.isPackageFragmentRoot"/>
+                                    </or>
+                                </and>
                             </or>
                         </iterate>
                     </with>
