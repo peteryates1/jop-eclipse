@@ -97,8 +97,23 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 			String mainClass = extractMainClass(element);
 			IJavaProject javaProject = element.getJavaProject();
 			IProject project = javaProject != null ? javaProject.getProject() : null;
-			ILaunchConfiguration config = findOrCreateJavaConfig(mainClass, project);
-			DebugUITools.launch(config, mode);
+
+			ILaunchConfiguration existing = findJavaConfig(mainClass);
+			if (existing != null) {
+				// Existing config — launch directly
+				DebugUITools.launch(existing, mode);
+			} else {
+				// No config yet — create with defaults and open the dialog
+				ILaunchConfigurationWorkingCopy wc = createJavaConfigDefaults(mainClass, project);
+				ILaunchConfiguration saved = wc.doSave();
+				String groupId = ILaunchManager.DEBUG_MODE.equals(mode)
+						? "org.eclipse.debug.ui.launchGroup.debug"
+						: "org.eclipse.debug.ui.launchGroup.run";
+				DebugUITools.openLaunchConfigurationDialog(
+						JopUIPlugin.getDefault().getWorkbench()
+								.getActiveWorkbenchWindow().getShell(),
+						saved, groupId, null);
+			}
 		} catch (CoreException e) {
 			JopUIPlugin.getDefault().getLog().log(
 					new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID, "Launch failed", e));
@@ -133,20 +148,24 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		return element.getElementName();
 	}
 
-	private ILaunchConfiguration findOrCreateJavaConfig(String mainClass, IProject project)
-			throws CoreException {
+	private ILaunchConfiguration findJavaConfig(String mainClass) throws CoreException {
 		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
 		ILaunchConfigurationType type = manager.getLaunchConfigurationType(CONFIG_TYPE_ID);
 
-		// Look for existing config matching this main class
 		ILaunchConfiguration[] configs = manager.getLaunchConfigurations(type);
 		for (ILaunchConfiguration config : configs) {
 			if (mainClass.equals(config.getAttribute(JopLaunchDelegate.ATTR_MAIN_CLASS, ""))) {
 				return config;
 			}
 		}
+		return null;
+	}
 
-		// Create new config with RTL sim defaults
+	private ILaunchConfigurationWorkingCopy createJavaConfigDefaults(String mainClass, IProject project)
+			throws CoreException {
+		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
+		ILaunchConfigurationType type = manager.getLaunchConfigurationType(CONFIG_TYPE_ID);
+
 		String name = manager.generateLaunchConfigurationName(mainClass);
 		ILaunchConfigurationWorkingCopy wc = type.newInstance(null, name);
 
@@ -168,7 +187,7 @@ public class JopLaunchShortcut implements ILaunchShortcut {
 		wc.setAttribute(JopLaunchDelegate.ATTR_SERIAL_PORT, "/dev/ttyUSB0");
 		wc.setAttribute(JopLaunchDelegate.ATTR_BAUD_RATE, 1_000_000);
 
-		return wc.doSave();
+		return wc;
 	}
 
 	private void launch(IFile file, String mode) {

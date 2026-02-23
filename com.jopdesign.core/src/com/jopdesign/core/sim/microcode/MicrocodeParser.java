@@ -29,7 +29,11 @@ public class MicrocodeParser {
 	private static final Pattern CONST_PATTERN = Pattern.compile("^[ \\t]*(\\w+)[ \\t]*=[ \\t]*(-?(?:0[xX][0-9a-fA-F]+|\\d+))");
 	private static final Pattern VAR_PATTERN = Pattern.compile("^[ \\t]*(\\w+)[ \\t]+\\?[ \\t]*$");
 	private static final Pattern LABEL_PATTERN = Pattern.compile("^[ \\t]*(\\w+)[ \\t]*:[ \\t]*$");
+	private static final Pattern LABEL_INSTR_PATTERN = Pattern.compile("^[ \\t]*(\\w+)[ \\t]*:[ \\t]+(\\w+)(?:[ \\t]+(.+?))?[ \\t]*$");
 	private static final Pattern INSTRUCTION_PATTERN = Pattern.compile("^[ \\t]*(\\w+)(?:[ \\t]+(.+?))?[ \\t]*$");
+
+	/** Branch/pipeline conditions — stripped from instruction operands (not simulated). */
+	private static final Set<String> CONDITIONS = Set.of("nxt", "opd");
 
 	/** Known instruction mnemonics (the 65-instruction JOP ISA). */
 	private static final Set<String> MNEMONICS = Set.of(
@@ -124,31 +128,26 @@ public class MicrocodeParser {
 				continue;
 			}
 
-			// Try instruction
+			// Try label with inline instruction (e.g. "nop: nop nxt", "iconst_0: ldi 0 nxt")
+			m = LABEL_INSTR_PATTERN.matcher(line);
+			if (m.matches()) {
+				String labelName = m.group(1);
+				String mnemonic = m.group(2);
+				String operand = stripCondition(m.group(3));
+				labels.put(labelName, rawInstructions.size());
+				if (!MNEMONICS.contains(mnemonic)) {
+					throw new MicrocodeParseException(lineNum,
+							"Unknown instruction: " + mnemonic);
+				}
+				rawInstructions.add(new RawInstruction(mnemonic, operand, lineNum));
+				continue;
+			}
+
+			// Try instruction (e.g. "nop", "pop nxt", "ldi 5")
 			m = INSTRUCTION_PATTERN.matcher(line);
 			if (m.matches()) {
 				String mnemonic = m.group(1);
-				String operand = m.group(2);
-
-				// Check if it's a label with trailing instruction (e.g. "loop: nop")
-				if (mnemonic.endsWith(":")) {
-					String labelName = mnemonic.substring(0, mnemonic.length() - 1);
-					labels.put(labelName, rawInstructions.size());
-					// The rest is the instruction
-					if (operand != null) {
-						String rest = operand.trim();
-						Matcher instrMatcher = INSTRUCTION_PATTERN.matcher(rest);
-						if (instrMatcher.matches()) {
-							mnemonic = instrMatcher.group(1);
-							operand = instrMatcher.group(2);
-						} else {
-							throw new MicrocodeParseException(lineNum,
-									"Cannot parse instruction after label: " + rest);
-						}
-					} else {
-						continue; // Just a label, no instruction
-					}
-				}
+				String operand = stripCondition(m.group(2));
 
 				if (!MNEMONICS.contains(mnemonic)) {
 					throw new MicrocodeParseException(lineNum,
@@ -229,6 +228,28 @@ public class MicrocodeParser {
 
 		throw new MicrocodeParseException(raw.lineNum,
 				"Unresolved operand: " + op);
+	}
+
+	/**
+	 * Strip trailing branch condition (e.g. "nxt") from an operand string.
+	 * Returns null if the operand is only a condition or was already null.
+	 */
+	private static String stripCondition(String operand) {
+		if (operand == null) return null;
+		String trimmed = operand.trim();
+		if (trimmed.isEmpty()) return null;
+
+		// If the whole operand is just a condition, strip it entirely
+		if (CONDITIONS.contains(trimmed)) return null;
+
+		// If it ends with a condition, strip the trailing condition word
+		for (String cond : CONDITIONS) {
+			if (trimmed.endsWith(" " + cond) || trimmed.endsWith("\t" + cond)) {
+				String stripped = trimmed.substring(0, trimmed.length() - cond.length()).trim();
+				return stripped.isEmpty() ? null : stripped;
+			}
+		}
+		return trimmed;
 	}
 
 	private static String stripComment(String line) {
