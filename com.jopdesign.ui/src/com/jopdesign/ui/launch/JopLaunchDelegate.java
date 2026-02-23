@@ -28,6 +28,7 @@ import com.jopdesign.core.sim.JopSimJopTarget;
 import com.jopdesign.core.sim.JopSuspendReason;
 import com.jopdesign.core.sim.JopTargetException;
 import com.jopdesign.core.sim.JopTargetState;
+import com.jopdesign.core.sim.ProtocolJopTarget;
 import com.jopdesign.core.sim.RtlSimJopTarget;
 import com.jopdesign.core.sim.SimulatorJopTarget;
 import com.jopdesign.core.sim.microcode.MicrocodeParser;
@@ -157,6 +158,11 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 					"No microcode file specified"));
 		}
 
+		MicrocodeProgram program = parseMicrocodeFile(filePath);
+		return new SimulatorJopTarget(program, 1024, memSize, initialSP);
+	}
+
+	private MicrocodeProgram parseMicrocodeFile(String filePath) throws CoreException {
 		String source;
 		try {
 			IFile wsFile = ResourcesPlugin.getWorkspace().getRoot().getFile(
@@ -171,15 +177,12 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 					"Cannot read microcode file: " + filePath, e));
 		}
 
-		MicrocodeProgram program;
 		try {
-			program = new MicrocodeParser().parse(source);
+			return new MicrocodeParser().parse(source);
 		} catch (MicrocodeParseException e) {
 			throw new CoreException(new Status(IStatus.ERROR, JopUIPlugin.PLUGIN_ID,
 					"Parse error: " + e.getMessage(), e));
 		}
-
-		return new SimulatorJopTarget(program, 1024, memSize, initialSP);
 	}
 
 	private JopSimJopTarget createJopSimTarget(ILaunchConfiguration configuration)
@@ -214,7 +217,9 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 					"No SBT project directory specified for RTL simulation"));
 		}
 
-		return new RtlSimJopTarget(sbtProjectDir, sbtPath, debugPort);
+		RtlSimJopTarget target = new RtlSimJopTarget(sbtProjectDir, sbtPath, debugPort);
+		loadMicrocodeForProtocolTarget(configuration, target);
+		return target;
 	}
 
 	private FpgaJopTarget createFpgaTarget(ILaunchConfiguration configuration)
@@ -227,7 +232,29 @@ public class JopLaunchDelegate implements ILaunchConfigurationDelegate {
 					"No serial port specified for FPGA target"));
 		}
 
-		return new FpgaJopTarget(serialPort, baudRate);
+		FpgaJopTarget target = new FpgaJopTarget(serialPort, baudRate);
+		loadMicrocodeForProtocolTarget(configuration, target);
+		return target;
+	}
+
+	/**
+	 * If the launch config has a microcode file, parse it and attach to
+	 * the protocol target for source-level debugging (PC→line mapping).
+	 */
+	private void loadMicrocodeForProtocolTarget(ILaunchConfiguration configuration,
+			ProtocolJopTarget target) throws CoreException {
+		String filePath = configuration.getAttribute(ATTR_MICROCODE_FILE, "");
+		if (filePath.isEmpty()) return;
+
+		try {
+			MicrocodeProgram program = parseMicrocodeFile(filePath);
+			target.setMicrocodeProgram(program);
+		} catch (CoreException e) {
+			// Non-fatal: source mapping won't work but debugging still functions
+			JopUIPlugin.getDefault().getLog().log(new Status(IStatus.WARNING,
+					JopUIPlugin.PLUGIN_ID,
+					"Could not load microcode for source mapping: " + e.getMessage()));
+		}
 	}
 
 	private String resolveFilePath(String path) {

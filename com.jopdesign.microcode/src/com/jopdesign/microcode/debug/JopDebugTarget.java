@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.core.resources.IMarkerDelta;
+import org.eclipse.core.runtime.ILog;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
@@ -18,7 +19,6 @@ import org.eclipse.debug.core.model.IMemoryBlock;
 import org.eclipse.debug.core.model.IProcess;
 import org.eclipse.debug.core.model.IThread;
 
-
 import com.jopdesign.core.sim.IJopTarget;
 import com.jopdesign.core.sim.IJopTargetListener;
 import com.jopdesign.core.sim.JopBreakpointType;
@@ -32,6 +32,7 @@ import com.jopdesign.core.sim.JopTargetState;
  */
 public class JopDebugTarget implements IDebugTarget {
 
+	private static final ILog LOG = Platform.getLog(JopDebugTarget.class);
 	public static final String MODEL_ID = "com.jopdesign.debug";
 
 	private final ILaunch launch;
@@ -142,7 +143,10 @@ public class JopDebugTarget implements IDebugTarget {
 		try {
 			target.stepMicro();
 		} catch (JopTargetException e) {
-			throw new DebugException(new Status(IStatus.ERROR, MODEL_ID, e.getMessage(), e));
+			// Log instead of showing error dialog (e.g. NAK "CPU not halted")
+			LOG.warn("stepOver failed: " + e.getMessage());
+			// Re-fire SUSPEND so UI stays consistent
+			fireEvent(new DebugEvent(thread, DebugEvent.SUSPEND, DebugEvent.STEP_END));
 		}
 	}
 
@@ -151,7 +155,8 @@ public class JopDebugTarget implements IDebugTarget {
 		try {
 			target.stepBytecode();
 		} catch (JopTargetException e) {
-			throw new DebugException(new Status(IStatus.ERROR, MODEL_ID, e.getMessage(), e));
+			LOG.warn("stepInto failed: " + e.getMessage());
+			fireEvent(new DebugEvent(thread, DebugEvent.SUSPEND, DebugEvent.STEP_END));
 		}
 	}
 

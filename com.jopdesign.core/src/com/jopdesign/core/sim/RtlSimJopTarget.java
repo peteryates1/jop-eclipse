@@ -11,7 +11,6 @@ import java.util.List;
 import org.eclipse.core.runtime.ILog;
 import org.eclipse.core.runtime.Platform;
 
-import com.jopdesign.core.sim.protocol.JopProtocolException;
 import com.jopdesign.core.sim.transport.JopTcpTransport;
 
 /**
@@ -39,6 +38,7 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 	private final int port;
 	private Process simProcess;
 	private Thread outputThread;
+	private Thread shutdownHook;
 
 	/**
 	 * @param sbtProjectDir  path to the SpinalHDL SBT project directory
@@ -63,7 +63,13 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 		launchSimProcess();
 
 		// Wait for TCP server to become available, then connect
-		connectWithRetry();
+		try {
+			connectWithRetry();
+		} catch (JopTargetException e) {
+			// Connection failed — kill the SBT process so port is freed
+			stopSimProcess();
+			throw e;
+		}
 	}
 
 	@Override
@@ -88,6 +94,10 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 			pb.redirectErrorStream(true);
 			simProcess = pb.start();
 
+			// Register shutdown hook to kill process tree on JVM exit
+			shutdownHook = new Thread(this::destroyProcessTree, "RtlSim-Shutdown");
+			Runtime.getRuntime().addShutdownHook(shutdownHook);
+
 			// Capture and forward simulation output
 			outputThread = new Thread(() -> {
 				try (BufferedReader reader = new BufferedReader(
@@ -95,7 +105,6 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 					String line;
 					while ((line = reader.readLine()) != null) {
 						LOG.info("[RTL Sim] " + line);
-						// Forward as output
 						fireSimOutput(line + "\n");
 					}
 				} catch (IOException e) {
@@ -143,19 +152,52 @@ public class RtlSimJopTarget extends ProtocolJopTarget {
 	}
 
 	private void stopSimProcess() {
+		// Remove shutdown hook (no longer needed if we're cleaning up explicitly)
+		if (shutdownHook != null) {
+			try {
+				Runtime.getRuntime().removeShutdownHook(shutdownHook);
+			} catch (IllegalStateException e) {
+				// JVM is already shutting down — hook will run on its own
+			}
+			shutdownHook = null;
+		}
 		if (outputThread != null) {
 			outputThread.interrupt();
 			outputThread = null;
 		}
-		if (simProcess != null) {
-			simProcess.destroyForcibly();
-			try {
-				simProcess.waitFor();
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-			simProcess = null;
+		destroyProcessTree();
+	}
+
+	/**
+	 * Kill the SBT process and all its descendants (child JVMs).
+	 * SBT forks a child JVM for "runMain" which holds the TCP server socket.
+	 * {@code destroyForcibly()} alone only kills the SBT wrapper, leaving
+	 * the child JVM running and holding the port.
+	 */
+	private void destroyProcessTree() {
+		if (simProcess == null) {
+			return;
 		}
+		// Destroy descendants first (the forked JVM running JopDebugSim),
+		// then the SBT process itself
+		try {
+			simProcess.descendants().forEach(ph -> {
+				try {
+					ph.destroyForcibly();
+				} catch (Exception e) {
+					// Best effort
+				}
+			});
+		} catch (Exception e) {
+			// descendants() may fail if process already exited
+		}
+		simProcess.destroyForcibly();
+		try {
+			simProcess.waitFor();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		simProcess = null;
 	}
 
 	private void fireSimOutput(String text) {

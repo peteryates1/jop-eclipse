@@ -3,6 +3,8 @@ package com.jopdesign.core.sim;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.jopdesign.core.sim.microcode.MicrocodeProgram;
+import com.jopdesign.core.sim.microcode.MicrocodeStatement;
 import com.jopdesign.core.sim.protocol.JopMessage;
 import com.jopdesign.core.sim.protocol.JopMessageType;
 import com.jopdesign.core.sim.protocol.JopNakCode;
@@ -41,6 +43,8 @@ public class ProtocolJopTarget implements IJopTarget {
 
 	private JopTargetState state = JopTargetState.NOT_STARTED;
 	private JopTargetInfo targetInfo;
+	private MicrocodeProgram microcodeProgram;
+	private JopRegisters cachedRegisters;
 	private final List<IJopTargetListener> listeners = new CopyOnWriteArrayList<>();
 
 	/**
@@ -96,11 +100,15 @@ public class ProtocolJopTarget implements IJopTarget {
 			// HALT the target on connect
 			sendCommand(JopMessageType.HALT);
 			expectAck(DEFAULT_TIMEOUT_MS);
-			// Wait for HALTED notification (the read thread dispatches it)
-			// Give it a moment then update state
-			Thread.sleep(50);
-			state = JopTargetState.SUSPENDED;
-			fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.MANUAL, -1);
+			// The HALTED notification will arrive asynchronously and be handled
+			// by handleNotification(), which sets state=SUSPENDED and fires
+			// stateChanged. We wait briefly for it but also set state ourselves
+			// in case the notification was already consumed.
+			Thread.sleep(200);
+			if (state != JopTargetState.SUSPENDED) {
+				state = JopTargetState.SUSPENDED;
+				fireStateChanged(JopTargetState.SUSPENDED, JopSuspendReason.MANUAL, -1);
+			}
 
 		} catch (JopTargetException e) {
 			transport.close();
@@ -126,6 +134,7 @@ public class ProtocolJopTarget implements IJopTarget {
 	public void resume() throws JopTargetException {
 		checkConnected();
 		try {
+			cachedRegisters = null;
 			sendCommand(JopMessageType.RESUME);
 			expectAck(DEFAULT_TIMEOUT_MS);
 			state = JopTargetState.RUNNING;
@@ -380,7 +389,13 @@ public class ProtocolJopTarget implements IJopTarget {
 
 	@Override
 	public int resolveLineToAddress(int sourceLine) {
-		return -1; // Hardware targets don't have source mapping
+		if (microcodeProgram != null) {
+			Integer stmtIdx = microcodeProgram.lineToStatement().get(sourceLine);
+			if (stmtIdx != null) {
+				return stmtIdx;
+			}
+		}
+		return -1;
 	}
 
 	@Override
@@ -390,12 +405,29 @@ public class ProtocolJopTarget implements IJopTarget {
 
 	@Override
 	public int getCurrentSourceLine() {
-		return -1;
+		if (microcodeProgram == null) return -1;
+		int pc = getCachedOrReadPC();
+		if (pc < 0) return -1;
+		Integer line = microcodeProgram.statementToLine().get(pc);
+		return line != null ? line : -1;
 	}
 
 	@Override
 	public String getCurrentInstructionName() {
-		return null;
+		if (microcodeProgram == null) return null;
+		int pc = getCachedOrReadPC();
+		if (pc < 0 || pc >= microcodeProgram.statements().size()) return null;
+		MicrocodeStatement stmt = microcodeProgram.statements().get(pc);
+		return stmt.mnemonic();
+	}
+
+	/**
+	 * Set a parsed microcode program for source-level debugging.
+	 * When set, getCurrentSourceLine() and getCurrentInstructionName()
+	 * will map the hardware PC to source locations.
+	 */
+	public void setMicrocodeProgram(MicrocodeProgram program) {
+		this.microcodeProgram = program;
 	}
 
 	@Override
@@ -474,7 +506,23 @@ public class ProtocolJopTarget implements IJopTarget {
 			JopSuspendReason reason = JopSuspendReason.byProtocolCode(reasonCode);
 			int bpSlot = (slot == 0xFF) ? -1 : slot;
 			state = JopTargetState.SUSPENDED;
+			// Invalidate cached registers — they'll be fetched lazily on next access.
+			// Do NOT call readRegisters() here because this runs on the read thread
+			// and would race with commands on the UI thread.
+			cachedRegisters = null;
 			fireStateChanged(JopTargetState.SUSPENDED, reason, bpSlot);
+		}
+	}
+
+	private int getCachedOrReadPC() {
+		if (cachedRegisters != null) {
+			return cachedRegisters.pc();
+		}
+		try {
+			cachedRegisters = readRegisters();
+			return cachedRegisters.pc();
+		} catch (JopTargetException e) {
+			return -1;
 		}
 	}
 

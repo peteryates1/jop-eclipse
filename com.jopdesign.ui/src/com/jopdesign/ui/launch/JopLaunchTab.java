@@ -263,8 +263,8 @@ public class JopLaunchTab extends AbstractLaunchConfigurationTab {
 		boolean isRtlSim = (idx == IDX_RTLSIM);
 		boolean isFpga = (idx == IDX_FPGA);
 
-		// Microcode simulator fields
-		fileText.setEnabled(isSimulator);
+		// Microcode file: needed for simulator, optional for RTL sim / FPGA (source mapping)
+		fileText.setEnabled(isSimulator || isRtlSim || isFpga);
 		spSpinner.setEnabled(isSimulator);
 		memSpinner.setEnabled(isSimulator);
 
